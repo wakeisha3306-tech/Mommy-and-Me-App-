@@ -3,6 +3,7 @@ import { HeartHandshake, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { type ProfileRole, useAuth } from "@/context/auth-context";
+import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 import { deriveDisplayName } from "@/lib/utils";
 
 const ROLE_OPTIONS: ProfileRole[] = ["Mom", "Daughter"];
@@ -45,10 +46,11 @@ export default function OnboardingPage() {
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
               <HeartHandshake className="h-8 w-8" />
             </div>
-            <p className="text-sm font-medium text-muted-foreground">Welcome, {welcomeName}</p>
+            <p className="text-sm font-medium text-muted-foreground">Welcome to {APP_NAME}, {welcomeName}</p>
             <h1 className="mt-2 font-serif text-4xl text-foreground">Make it feel like home</h1>
+            <p className="mt-2 text-sm font-medium text-primary/75">{APP_TAGLINE}</p>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Tell us what to call you and whether this account belongs to Mom or Daughter.
+              Tell us what to call you and whether this account belongs to Mom or Daughter so your space feels personal from the start.
             </p>
           </div>
 

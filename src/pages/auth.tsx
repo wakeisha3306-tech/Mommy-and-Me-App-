@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import { useAuth } from "@/context/auth-context";
+import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 
 type AuthMode = "login" | "signup";
 
@@ -29,8 +30,8 @@ export default function AuthPage() {
   const helperText = useMemo(
     () =>
       mode === "signup"
-        ? "Create a private account so your journal and saved affirmations stay yours."
-        : "Sign back in to open your saved space.",
+        ? "Create your private account and keep your reflections, notes, and saved moments close."
+        : "Sign back in to your private space.",
     [mode],
   );
 
@@ -285,8 +286,9 @@ export default function AuthPage() {
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
               <HeartHandshake className="h-8 w-8" />
             </div>
-            <p className="text-sm font-medium text-muted-foreground">Private family journal</p>
-            <h1 className="mt-2 font-serif text-4xl text-foreground">Mommy & Me</h1>
+            <p className="text-sm font-medium uppercase tracking-[0.22em] text-primary/75">Private connection app</p>
+            <h1 className="mt-2 font-serif text-4xl text-foreground">{APP_NAME}</h1>
+            <p className="mt-2 text-sm font-medium text-muted-foreground">{APP_TAGLINE}</p>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">{helperText}</p>
           </div>
 

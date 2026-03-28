@@ -1,9 +1,9 @@
 import { FormEvent, useState } from "react";
 import { LockKeyhole } from "lucide-react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/auth-context";
-import { useLocation } from "wouter";
 
 const MIN_PASSWORD_LENGTH = 6;
 
@@ -56,7 +56,7 @@ export default function ResetPasswordPage() {
             <h1 className="mt-2 font-serif text-4xl text-foreground">Choose a new password</h1>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
               {recoveryMode
-                ? "Create a new password for your account, then we’ll send you back into your space."
+                ? "Create a new password for your account, then we'll send you back into your space."
                 : "Open this page from the reset link in your email to choose a new password."}
             </p>
           </div>

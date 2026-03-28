@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Download, Share2, X } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { toast } from "@/hooks/use-toast";
+import { APP_NAME, SHARE_CARD_TAGLINE } from "@/lib/brand";
 import { downloadShareCard, shareShareCard, type ShareCardContent } from "@/lib/share-card";
 
 interface ShareMomentDialogProps {
@@ -84,7 +85,7 @@ export function ShareMomentDialog({ item, onClose }: ShareMomentDialogProps) {
         <div className="flex items-center justify-between border-b border-border/70 px-5 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Share a Moment</p>
-            <h2 className="mt-1 text-2xl font-serif text-foreground">A gentle little card</h2>
+            <h2 className="mt-1 text-2xl font-serif text-foreground">A beautiful card from {APP_NAME}</h2>
           </div>
           <button
             type="button"
@@ -98,15 +99,18 @@ export function ShareMomentDialog({ item, onClose }: ShareMomentDialogProps) {
         <div className="px-5 py-5">
           <div className="overflow-hidden rounded-[1.8rem] bg-gradient-to-br from-[#fff6ef] via-[#f8e5ea] to-[#ede7f7] p-5 shadow-lg">
             <div className="rounded-[1.5rem] border border-white/80 bg-white/75 px-5 py-6 shadow-sm backdrop-blur-sm">
-              <p className="text-center text-[11px] font-semibold uppercase tracking-[0.25em] text-primary/80">Mommy & Me</p>
-              <p className="mt-3 text-center text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              <p className="text-center text-[11px] font-semibold uppercase tracking-[0.25em] text-primary/80">{APP_NAME}</p>
+              <p className="mt-2 text-center text-[11px] font-medium tracking-[0.18em] text-muted-foreground">
+                A space just for us.
+              </p>
+              <p className="mt-4 text-center text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                 {personalizedItem.label}
               </p>
               <p className="mt-5 text-center text-2xl font-serif leading-snug text-foreground">
                 "{personalizedItem.text}"
               </p>
               <p className="mt-5 text-center text-sm text-muted-foreground">
-                {personalizedItem.tagline ?? "A moment that mattered"}
+                {personalizedItem.tagline ?? SHARE_CARD_TAGLINE}
               </p>
               <p className="mt-4 text-center text-xs text-primary/70">{personalizedItem.closingLine}</p>
               {personalizedItem.senderLine ? (

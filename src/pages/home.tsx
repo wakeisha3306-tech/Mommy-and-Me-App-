@@ -26,6 +26,7 @@ import { useAffirmations } from "@/hooks/use-affirmations";
 import { useNotes } from "@/hooks/use-notes";
 import { useRealMoments } from "@/hooks/use-real-moments";
 import { getDailyAffirmation } from "@/lib/affirmations";
+import { APP_NAME, APP_TAGLINE, SHARE_CARD_TAGLINE } from "@/lib/brand";
 import type { ShareCardContent } from "@/lib/share-card";
 import { formatFriendlyTimestamp, getUserLabel } from "@/lib/utils";
 
@@ -278,11 +279,12 @@ export default function Home() {
             <div className="absolute inset-0 rounded-full ring-2 ring-primary/30" />
           </div>
           <div className="min-w-0">
-            <p className="text-lg font-medium leading-tight text-foreground">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-primary/75">Private connection space</p>
+            <p className="mt-2 text-lg font-medium leading-tight text-foreground">
               {greeting}, <span className="text-primary">{displayName}</span>
             </p>
-            <h1 className="mt-1 text-3xl font-serif leading-tight text-foreground">Mommy & Me</h1>
-            <p className="mt-1 text-sm text-muted-foreground">A safe space, just for us.</p>
+            <h1 className="mt-1 text-[2.15rem] font-serif leading-tight tracking-[0.02em] text-foreground">{APP_NAME}</h1>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">{APP_TAGLINE}</p>
           </div>
         </motion.div>
 
@@ -515,7 +517,7 @@ export default function Home() {
                           setShareItem({
                             label: "Real Moment",
                             text: moment.text,
-                            tagline: "A moment that mattered",
+                            tagline: SHARE_CARD_TAGLINE,
                           })
                         }
                         className="rounded-full border border-white/70 bg-white px-3 py-1.5 text-[11px] font-semibold text-muted-foreground shadow-sm transition-all duration-200 hover:text-primary"
@@ -652,3 +654,5 @@ export default function Home() {
     </Layout>
   );
 }
+
+

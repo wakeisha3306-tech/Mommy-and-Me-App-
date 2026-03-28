@@ -7,13 +7,11 @@ import { ContentState } from "@/components/content-state";
 import { useAuth } from "@/context/auth-context";
 import { useNotes, type NoteAuthor } from "@/hooks/use-notes";
 import { toast } from "@/hooks/use-toast";
+import { SHARE_CARD_TAGLINE } from "@/lib/brand";
 import type { ShareCardContent } from "@/lib/share-card";
 import { formatFriendlyTimestamp } from "@/lib/utils";
 
-const AUTHOR_CONFIG: Record<
-  NoteAuthor,
-  { emoji: string; bgCard: string; badge: string; nameBg: string }
-> = {
+const AUTHOR_CONFIG: Record<NoteAuthor, { emoji: string; bgCard: string; badge: string; nameBg: string }> = {
   Mom: {
     emoji: "👩🏾",
     bgCard: "bg-primary/8 border-primary/15",
@@ -29,7 +27,7 @@ const AUTHOR_CONFIG: Record<
 };
 
 const QUICK_NOTES = [
-  "I love you so much 💕",
+  "I love you so much 💛",
   "You make me so proud 🌟",
   "Thank you for being you 🌸",
   "I'm always here for you 🤗",
@@ -63,7 +61,7 @@ export default function Notes() {
       if (!success) {
         toast({
           title: "Couldn't save note",
-          description: "Please check your Supabase setup and try again.",
+          description: "Please try again in a moment.",
         });
         return;
       }
@@ -78,7 +76,7 @@ export default function Notes() {
 
   return (
     <Layout title="Our Notes" subtitle="Little messages between us, always">
-      <div className="section-stack mt-3">
+      <div className="mt-3 section-stack">
         <ShareMomentDialog item={shareItem} onClose={() => setShareItem(null)} />
         {error ? (
           <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -86,20 +84,14 @@ export default function Notes() {
           </div>
         ) : null}
 
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="app-card overflow-hidden"
-        >
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="app-card overflow-hidden">
           <div className="flex border-b border-border">
             {(["Mom", "Daughter"] as NoteAuthor[]).map((nextAuthor) => (
               <button
                 key={nextAuthor}
                 onClick={() => setAuthor(nextAuthor)}
                 className={`flex flex-1 items-center justify-center gap-2 py-3.5 text-sm font-semibold transition-all duration-200 ${
-                  author === nextAuthor
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted/50"
+                  author === nextAuthor ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/50"
                 }`}
               >
                 <span>{AUTHOR_CONFIG[nextAuthor].emoji}</span>
@@ -132,12 +124,8 @@ export default function Notes() {
             <textarea
               value={text}
               onChange={(event) => setText(event.target.value)}
-              placeholder={
-                author === "Mom"
-                  ? "Leave a little love note for your daughter..."
-                  : "Leave a little love note for Mom..."
-              }
-              className="w-full min-h-[100px] resize-none rounded-2xl bg-muted/30 p-4 text-base text-foreground placeholder:text-muted-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-primary/20"
+              placeholder={author === "Mom" ? "Leave a little love note for your daughter..." : "Leave a little love note for Mom..."}
+              className="min-h-[100px] w-full resize-none rounded-2xl bg-muted/30 p-4 text-base text-foreground placeholder:text-muted-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
 
             <div className="mt-4 flex justify-end">
@@ -154,9 +142,7 @@ export default function Notes() {
         </motion.div>
 
         <div>
-          <p className="mb-3 px-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Our Conversation
-          </p>
+          <p className="mb-3 px-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Our Conversation</p>
 
           {!isLoaded ? (
             <ContentState message="Loading notes..." loading />
@@ -204,7 +190,7 @@ export default function Notes() {
                                 setShareItem({
                                   label: "Note",
                                   text: note.text,
-                                  tagline: "A moment that mattered",
+                                  tagline: SHARE_CARD_TAGLINE,
                                 })
                               }
                               className="rounded-full border border-border bg-white px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground shadow-sm transition-all duration-200 hover:text-primary"
@@ -244,7 +230,7 @@ export default function Notes() {
                                 onClick={() => {
                                   void deleteNote(note.id);
                                 }}
-                                className="flex h-6 w-6 items-center justify-center rounded-full border border-border bg-white text-muted-foreground shadow-sm opacity-0 transition-all duration-200 hover:text-destructive group-hover:opacity-100"
+                                className="flex h-6 w-6 items-center justify-center rounded-full border border-border bg-white text-muted-foreground opacity-0 shadow-sm transition-all duration-200 hover:text-destructive group-hover:opacity-100"
                               >
                                 <Trash2 className="h-3 w-3" />
                               </button>

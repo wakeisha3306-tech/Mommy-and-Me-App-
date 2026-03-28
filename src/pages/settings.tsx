@@ -104,7 +104,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <Layout title="Settings" subtitle="Manage your account and profile space">
+    <Layout title="Settings" subtitle="Manage your Between Us account and private space">
       <div className="section-stack mt-3">
         <section className="app-card p-6">
           <div className="flex items-start gap-4">

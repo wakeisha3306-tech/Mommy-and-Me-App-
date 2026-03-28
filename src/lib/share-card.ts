@@ -1,3 +1,5 @@
+import { APP_NAME, SHARE_CARD_TAGLINE } from "@/lib/brand";
+
 export interface ShareCardContent {
   text: string;
   label: string;
@@ -76,10 +78,10 @@ function buildSvgMarkup(content: ShareCardContent) {
       </g>
 
       <text x="540" y="205" text-anchor="middle" font-size="32" letter-spacing="8" fill="#8d6570" font-family="Georgia, serif">
-        MOMMY &amp; ME
+        ${escapeXml(APP_NAME.toUpperCase())}
       </text>
       <text x="540" y="260" text-anchor="middle" font-size="22" letter-spacing="3" fill="#b1838d" font-family="Arial, sans-serif">
-        ${escapeXml(content.tagline ?? "A moment that mattered")}
+        ${escapeXml(content.tagline ?? SHARE_CARD_TAGLINE)}
       </text>
 
       <rect x="380" y="314" width="320" height="48" rx="24" fill="rgba(205,142,159,0.12)" />
@@ -147,7 +149,7 @@ async function svgToPngBlob(svgMarkup: string) {
 
 export async function createShareCardFile(content: ShareCardContent) {
   const pngBlob = await svgToPngBlob(buildSvgMarkup(content));
-  return new File([pngBlob], "mommy-and-me-moment.png", { type: "image/png" });
+  return new File([pngBlob], "between-us-moment.png", { type: "image/png" });
 }
 
 export async function downloadShareCard(content: ShareCardContent) {
@@ -169,8 +171,8 @@ export async function shareShareCard(content: ShareCardContent) {
 
   if (navigator.canShare?.({ files: [file] }) && navigator.share) {
     await navigator.share({
-      title: "Mommy & Me",
-      text: content.tagline ?? "A moment that mattered",
+      title: APP_NAME,
+      text: content.tagline ?? SHARE_CARD_TAGLINE,
       files: [file],
     });
     return true;

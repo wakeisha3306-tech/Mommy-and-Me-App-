@@ -58,7 +58,7 @@ export default function ConnectPage() {
       return;
     }
 
-    setStatusMessage("You’re connected now. Shared notes can be seen by both of you when you mark them as shared.");
+    setStatusMessage("You're connected now. Shared notes can be seen by both of you when you mark them as shared.");
   };
 
   const handleCopy = async (value: string, label: string) => {
@@ -73,7 +73,7 @@ export default function ConnectPage() {
 
   return (
     <Layout title="Connect" subtitle="Link Mom and Daughter, then decide what gets shared">
-      <div className="section-stack mt-3">
+      <div className="mt-3 section-stack">
         <section className="app-feature-card p-6">
           <div className="relative z-10">
             <div className="flex items-start gap-4">
@@ -121,7 +121,11 @@ export default function ConnectPage() {
                 Your connection has been active since {formatFriendlyTimestamp(connection.created_at)}.
               </p>
               <p className="text-sm text-muted-foreground">
-                Head to <Link href="/notes"><span className="cursor-pointer font-semibold text-primary">Notes</span></Link> to share something intentionally.
+                Head to{" "}
+                <Link href="/notes">
+                  <span className="cursor-pointer font-semibold text-primary">Notes</span>
+                </Link>{" "}
+                to share something intentionally.
               </p>
             </div>
           ) : (

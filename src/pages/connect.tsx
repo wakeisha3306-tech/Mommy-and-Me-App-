@@ -56,8 +56,8 @@ export default function ConnectPage() {
 
     setStatusMessage(
       profile?.role === "Mom"
-        ? "A new daughter invite is ready to copy and share."
-        : "Your invite is ready to copy and share with Mom.",
+        ? "Your invite is ready. Share it with your daughter whenever you want to open her space."
+        : "Your invite is ready. Share it with Mom when you're ready to connect.",
     );
   };
 
@@ -75,9 +75,10 @@ export default function ConnectPage() {
     }
 
     setStatusMessage(
-      profile?.role === "Mom"
-        ? "You're connected now. A new Between Us space is ready for this daughter."
-        : "You're connected now. Your Between Us and Family spaces are ready with Mom.",
+      result.message ??
+        (profile?.role === "Mom"
+          ? "You're connected now. A new Between Us space is ready for this daughter."
+          : "You're connected now. Your Between Us and Family spaces are ready with Mom."),
     );
   };
 
@@ -169,8 +170,8 @@ export default function ConnectPage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Invite codes</p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
                   {profile?.role === "Mom"
-                    ? "Create a new invite for each daughter you want to connect. Each daughter gets her own Between Us space with you."
-                    : "If you are not connected yet, you can create one invite for Mom or enter her code here."}
+                    ? "Create a gentle invite for each daughter you want to connect. Each daughter gets her own Between Us space with you."
+                    : "If you're not connected yet, you can enter Mom's code here or share your own invite with her."}
                 </p>
 
                 <div className="mt-4">
@@ -192,6 +193,9 @@ export default function ConnectPage() {
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Invite code</p>
                         <p className="mt-2 text-xl font-semibold tracking-[0.28em] text-foreground">{invite.code}</p>
                         <p className="mt-2 text-xs text-muted-foreground">Created {formatFriendlyTimestamp(invite.created_at)}</p>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                          Share this code or link with the person you want to connect with. Once they join, both of you will see a clear confirmation in the app.
+                        </p>
                         <div className="mt-3 flex flex-wrap gap-3">
                           <Button type="button" onClick={() => void handleCopy(invite.code, "Invite code")} className="app-button-secondary">
                             <Copy className="mr-2 h-4 w-4" />
@@ -211,7 +215,7 @@ export default function ConnectPage() {
               <form onSubmit={handleConnect} className="rounded-[1.4rem] border border-border/80 bg-muted/30 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Enter invite code</p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Paste the code from Mom or Daughter here to create a new intentional connection.
+                  Paste the code you were given here. Once it works, we'll clearly confirm that your connection is ready.
                 </p>
                 <div className="mt-4 space-y-3">
                   <Input

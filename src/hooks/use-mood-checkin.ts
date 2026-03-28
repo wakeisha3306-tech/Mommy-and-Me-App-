@@ -172,7 +172,7 @@ export function useMoodCheckin() {
       setIsSaving(false);
       return { error: null };
     },
-    [profile?.role, session?.user.id, todayCheckin?.id],
+    [profile?.role, session?.user.id],
   );
 
   const markAlertViewed = useCallback(

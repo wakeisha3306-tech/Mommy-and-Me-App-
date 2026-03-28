@@ -4,7 +4,7 @@ import { Layout } from "@/components/layout";
 import { useAuth } from "@/context/auth-context";
 import { useConnection } from "@/hooks/use-connection";
 import { Button } from "@/components/ui/button";
-import { Settings2, Mail, LogOut, HeartHandshake, KeyRound, ShieldCheck, RefreshCcw } from "lucide-react";
+import { Settings2, Mail, LogOut, HeartHandshake, KeyRound, ShieldCheck, RefreshCcw, Bell } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatFriendlyTimestamp, getUserLabel } from "@/lib/utils";
 
@@ -311,6 +311,25 @@ export default function SettingsPage() {
                   {changingEmail ? "Updating..." : "Change email"}
                 </Button>
               </form>
+            </div>
+          </div>
+        </section>
+
+        <section className="app-card-soft p-5">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Bell className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground">Notifications</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Keep connection updates, shared notes, direct messages, and mood alerts gentle and easy to follow.
+              </p>
+              <div className="mt-4">
+                <Link href="/notifications">
+                  <span className="cursor-pointer text-sm font-semibold text-primary">Open notification center</span>
+                </Link>
+              </div>
             </div>
           </div>
         </section>

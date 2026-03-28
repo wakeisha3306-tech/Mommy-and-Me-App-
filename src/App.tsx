@@ -9,6 +9,7 @@ import Home from "@/pages/home";
 import Affirmations from "@/pages/affirmations";
 import Journal from "@/pages/journal";
 import Notes from "@/pages/notes";
+import NotificationsPage from "@/pages/notifications";
 import SettingsPage from "@/pages/settings";
 import ConnectPage from "@/pages/connect";
 import NotFound from "@/pages/not-found";
@@ -88,6 +89,7 @@ function Router() {
       <Route path="/affirmations" component={Affirmations} />
       <Route path="/journal" component={Journal} />
       <Route path="/notes" component={Notes} />
+      <Route path="/notifications" component={NotificationsPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route path="/connect" component={ConnectPage} />
       <Route component={NotFound} />

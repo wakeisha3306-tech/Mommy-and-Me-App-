@@ -20,6 +20,13 @@ export interface Note {
 
 const NOTE_SELECT = "id, user_id, text, author, is_favorite, visibility, partner_id, family_owner_id, created_at";
 
+function getNotesErrorMessage(message: string) {
+  if (/visibility/i.test(message) && /does not exist/i.test(message)) {
+    return "Your database is missing the latest notes upgrade. Run the multi-daughter family-space SQL in Supabase, then refresh.";
+  }
+  return message;
+}
+
 function isBetweenUsMatch(note: Note, currentUserId?: string, partnerId?: string | null) {
   if (!currentUserId || !partnerId) return false;
   return (
@@ -76,7 +83,7 @@ export function useNotes() {
       setPrivateNotes([]);
       setBetweenUsNotesRaw([]);
       setFamilyNotes([]);
-      setError(nextError.message);
+      setError(getNotesErrorMessage(nextError.message));
       setIsLoaded(true);
       return;
     }
@@ -116,7 +123,7 @@ export function useNotes() {
       const { error: insertError } = await supabase.from("notes").insert(payload);
 
       if (insertError) {
-        setError(insertError.message);
+        setError(getNotesErrorMessage(insertError.message));
         return false;
       }
 
@@ -133,7 +140,7 @@ export function useNotes() {
       const { error: deleteError } = await supabase.from("notes").delete().eq("id", id).eq("user_id", session.user.id);
 
       if (deleteError) {
-        setError(deleteError.message);
+        setError(getNotesErrorMessage(deleteError.message));
         return false;
       }
 
@@ -154,7 +161,7 @@ export function useNotes() {
         .eq("user_id", session.user.id);
 
       if (updateError) {
-        setError(updateError.message);
+        setError(getNotesErrorMessage(updateError.message));
         return false;
       }
 
@@ -192,7 +199,7 @@ export function useNotes() {
         .eq("user_id", session.user.id);
 
       if (updateError) {
-        setError(updateError.message);
+        setError(getNotesErrorMessage(updateError.message));
         return false;
       }
 

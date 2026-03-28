@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getAuthRedirectUrl, supabase } from "@/lib/supabase";
 import { useAuth, type ProfileRole } from "@/context/auth-context";
+import { getUserLabel } from "@/lib/utils";
 
 interface PartnerProfileRow {
   id: string;
@@ -179,13 +180,29 @@ export function useConnection() {
 
   const connectWithCode = useCallback(
     async (code: string) => {
-      if (!supabase || !session?.user.id) {
+      if (!supabase || !session?.user.id || !profile?.role) {
         return { error: "You need to be signed in first." };
       }
 
       const trimmedCode = code.trim().toUpperCase();
       if (!trimmedCode) {
         return { error: "Enter the invite code you received." };
+      }
+
+      const { data: inviteRecord, error: inviteLookupError } = await supabase
+        .from("connection_invites")
+        .select("user_id, role")
+        .eq("code", trimmedCode)
+        .is("used_at", null)
+        .maybeSingle<{ user_id: string; role: ProfileRole }>();
+
+      if (inviteLookupError) {
+        setError(inviteLookupError.message);
+        return { error: inviteLookupError.message };
+      }
+
+      if (!inviteRecord) {
+        return { error: "That invite code is no longer available. Ask for a fresh one and try again." };
       }
 
       const { error: rpcError } = await supabase.rpc("accept_connection_invite", {
@@ -201,10 +218,23 @@ export function useConnection() {
         window.sessionStorage.removeItem("pending-connection-code");
       }
 
+      const { data: partnerProfile } = await supabase
+        .from("profiles")
+        .select("display_name, email")
+        .eq("id", inviteRecord.user_id)
+        .maybeSingle<{ display_name: string; email: string }>();
+
+      const partnerLabel = getUserLabel(partnerProfile?.display_name, partnerProfile?.email);
       await loadConnectionState();
-      return { error: null };
+      return {
+        error: null,
+        message:
+          profile.role === "Daughter"
+            ? `You're all set. ${partnerLabel} is connected now, and your Between Us space is ready.`
+            : `You're connected with ${partnerLabel}. Your one-to-one space is ready now.`,
+      };
     },
-    [loadConnectionState, session?.user.id],
+    [loadConnectionState, profile?.display_name, profile?.role, session?.user.email, session?.user.id],
   );
 
   const inviteLinks = useMemo(

@@ -1,8 +1,9 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Sparkles, BookHeart, MessageCircleHeart, LogOut, Settings } from "lucide-react";
+import { Home, Sparkles, BookHeart, MessageCircleHeart, LogOut, Settings, Bell } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/auth-context";
+import { useNotifications } from "@/hooks/use-notifications";
 import { getUserLabel } from "@/lib/utils";
 
 interface LayoutProps {
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
 export function Layout({ children, title, subtitle }: LayoutProps) {
   const [location] = useLocation();
   const { session, profile, signOut } = useAuth();
+  const { unreadCount } = useNotifications();
   const userLabel = getUserLabel(profile?.display_name, session?.user.email);
 
   return (
@@ -36,14 +38,27 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
             <p className="truncate text-sm font-medium text-foreground">{userLabel}</p>
             <p className="truncate text-xs text-muted-foreground">{session?.user.email}</p>
           </div>
-          <button
-            type="button"
-            onClick={() => void signOut()}
-            className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-          >
-            <LogOut className="h-4 w-4" />
-            Logout
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/notifications"
+              className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-white text-foreground transition-colors hover:bg-muted"
+            >
+              <Bell className="h-4 w-4" />
+              {unreadCount > 0 ? (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-white">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              ) : null}
+            </Link>
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </button>
+          </div>
         </div>
       </div>
 

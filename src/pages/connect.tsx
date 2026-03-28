@@ -33,6 +33,7 @@ export default function ConnectPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [autoConnectAttempted, setAutoConnectAttempted] = useState(false);
 
   useEffect(() => {
     if (!initialCode) return;
@@ -41,6 +42,34 @@ export default function ConnectPage() {
       window.sessionStorage.setItem("pending-connection-code", initialCode);
     }
   }, [initialCode]);
+
+  useEffect(() => {
+    if (!initialCode || !isLoaded || connections.length > 0 || connecting || autoConnectAttempted) {
+      return;
+    }
+
+    setAutoConnectAttempted(true);
+    setConnecting(true);
+    setStatusMessage("Finishing your connection...");
+    setSubmitError(null);
+
+    void connectWithCode(initialCode).then((result) => {
+      setConnecting(false);
+
+      if (result.error) {
+        setStatusMessage(null);
+        setSubmitError(result.error);
+        return;
+      }
+
+      setStatusMessage(
+        result.message ??
+          (profile?.role === "Mom"
+            ? "You're connected now. A new Between Us space is ready for this daughter."
+            : "You're connected now. Your Between Us and Family spaces are ready with Mom."),
+      );
+    });
+  }, [autoConnectAttempted, connectWithCode, connecting, connections.length, initialCode, isLoaded, profile?.role]);
 
   const handleCreateInvite = async () => {
     setStatusMessage(null);

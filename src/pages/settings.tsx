@@ -10,8 +10,9 @@ import { formatFriendlyTimestamp, getUserLabel } from "@/lib/utils";
 
 export default function SettingsPage() {
   const { session, profile, signOut, updatePassword, updateEmail, sendPasswordReset } = useAuth();
-  const { connections, partnerRole } = useConnection();
+  const { connection, connections, partnerRole } = useConnection();
   const userLabel = getUserLabel(profile?.display_name, session?.user.email);
+  const primaryPartnerLabel = getUserLabel(connection?.partner_name, connection?.partner_email ?? undefined);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -31,10 +32,12 @@ export default function SettingsPage() {
   const connectionSummary =
     profile?.role === "Mom"
       ? connections.length > 0
-        ? `${connections.length} connected daughter${connections.length === 1 ? "" : "s"}`
+        ? connections.length === 1
+          ? `Connected to ${primaryPartnerLabel}`
+          : `${connections.length} connected daughters`
         : "No daughters connected yet"
       : connections.length > 0
-        ? `Connected to: ${partnerRole}`
+        ? `Connected to ${primaryPartnerLabel || partnerRole}`
         : "Not connected yet";
 
   const handlePasswordSubmit = async (event: FormEvent<HTMLFormElement>) => {

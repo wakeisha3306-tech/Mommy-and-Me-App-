@@ -27,6 +27,11 @@ export interface ConnectionInvite {
   used_at: string | null;
 }
 
+interface ConnectionStateSnapshot {
+  connections: ConnectionInfo[];
+  activeInvites: ConnectionInvite[];
+}
+
 function getPartnerRole(role?: ProfileRole | null): ProfileRole | null {
   if (!role) return null;
   return role === "Mom" ? "Daughter" : "Mom";
@@ -44,14 +49,14 @@ export function useConnection() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadConnectionState = useCallback(async () => {
+  const loadConnectionState = useCallback(async (): Promise<ConnectionStateSnapshot> => {
     if (!supabase || !session?.user.id) {
       setConnections([]);
       setActiveInvites([]);
       setSelectedPartnerIdState(null);
       setError(null);
       setIsLoaded(true);
-      return;
+      return { connections: [], activeInvites: [] };
     }
 
     setIsLoaded(false);
@@ -77,7 +82,7 @@ export function useConnection() {
       setActiveInvites([]);
       setError(nextError);
       setIsLoaded(true);
-      return;
+      return { connections: [], activeInvites: [] };
     }
 
     const baseConnections = (connectionRows ?? []) as ConnectionInfo[];
@@ -106,6 +111,10 @@ export function useConnection() {
     setConnections(nextConnections);
     setActiveInvites((inviteRows ?? []) as ConnectionInvite[]);
     setIsLoaded(true);
+    return {
+      connections: nextConnections,
+      activeInvites: (inviteRows ?? []) as ConnectionInvite[],
+    };
   }, [session?.user.id]);
 
   useEffect(() => {
@@ -189,22 +198,6 @@ export function useConnection() {
         return { error: "Enter the invite code you received." };
       }
 
-      const { data: inviteRecord, error: inviteLookupError } = await supabase
-        .from("connection_invites")
-        .select("user_id, role")
-        .eq("code", trimmedCode)
-        .is("used_at", null)
-        .maybeSingle<{ user_id: string; role: ProfileRole }>();
-
-      if (inviteLookupError) {
-        setError(inviteLookupError.message);
-        return { error: inviteLookupError.message };
-      }
-
-      if (!inviteRecord) {
-        return { error: "That invite code is no longer available. Ask for a fresh one and try again." };
-      }
-
       const { error: rpcError } = await supabase.rpc("accept_connection_invite", {
         invite_code: trimmedCode,
       });
@@ -218,14 +211,12 @@ export function useConnection() {
         window.sessionStorage.removeItem("pending-connection-code");
       }
 
-      const { data: partnerProfile } = await supabase
-        .from("profiles")
-        .select("display_name, email")
-        .eq("id", inviteRecord.user_id)
-        .maybeSingle<{ display_name: string; email: string }>();
+      const nextState = await loadConnectionState();
+      const newestConnection = nextState.connections[nextState.connections.length - 1] ?? null;
+      const partnerLabel = newestConnection
+        ? getUserLabel(newestConnection.partner_name, newestConnection.partner_email ?? undefined)
+        : "your connection";
 
-      const partnerLabel = getUserLabel(partnerProfile?.display_name, partnerProfile?.email);
-      await loadConnectionState();
       return {
         error: null,
         message:

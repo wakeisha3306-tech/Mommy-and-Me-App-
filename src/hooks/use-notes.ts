@@ -6,9 +6,11 @@ export type NoteAuthor = "Mom" | "Daughter";
 
 export interface Note {
   id: string;
+  user_id: string;
   text: string;
   author: NoteAuthor;
   is_favorite: boolean;
+  is_shared: boolean;
   created_at: string;
 }
 
@@ -30,8 +32,7 @@ export function useNotes() {
     setError(null);
     const { data, error } = await supabase
       .from("notes")
-      .select("id, text, author, is_favorite, created_at")
-      .eq("user_id", session.user.id)
+      .select("id, user_id, text, author, is_favorite, is_shared, created_at")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -62,6 +63,7 @@ export function useNotes() {
         user_id: session.user.id,
         text: text.trim(),
         author,
+        is_shared: false,
       });
 
       if (error) {
@@ -120,5 +122,27 @@ export function useNotes() {
     [session?.user.id],
   );
 
-  return { notes, isLoaded, error, addNote, deleteNote, toggleFavorite, reloadNotes: loadNotes };
+  const toggleShared = useCallback(
+    async (id: string, isShared: boolean) => {
+      if (!supabase || !session?.user.id) return false;
+
+      const { error } = await supabase
+        .from("notes")
+        .update({ is_shared: isShared })
+        .eq("id", id)
+        .eq("user_id", session.user.id);
+
+      if (error) {
+        console.error(error);
+        setError(error.message);
+        return false;
+      }
+
+      setNotes((current) => current.map((note) => (note.id === id ? { ...note, is_shared: isShared } : note)));
+      return true;
+    },
+    [session?.user.id],
+  );
+
+  return { notes, isLoaded, error, addNote, deleteNote, toggleFavorite, toggleShared, reloadNotes: loadNotes };
 }

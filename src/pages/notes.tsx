@@ -15,10 +15,12 @@ import {
 import { Layout } from "@/components/layout";
 import { ContentState } from "@/components/content-state";
 import { ShareMomentDialog } from "@/components/share-moment-dialog";
+import { ReactionBar } from "@/components/reaction-bar";
 import { useAuth } from "@/context/auth-context";
 import { useConnection } from "@/hooks/use-connection";
 import { useDirectMessages } from "@/hooks/use-direct-messages";
 import { useNotes, type Note, type NoteSpace } from "@/hooks/use-notes";
+import { useReactions, type ReactionItemType, type ReactionValue } from "@/hooks/use-reactions";
 import { toast } from "@/hooks/use-toast";
 import { SHARE_CARD_TAGLINE } from "@/lib/brand";
 import type { ShareCardContent } from "@/lib/share-card";
@@ -102,6 +104,9 @@ function NotesList({
   onToggleFavorite,
   onDelete,
   onMove,
+  getUserReaction,
+  getReactionCounts,
+  onToggleReaction,
 }: {
   notes: Note[];
   currentUserId?: string;
@@ -112,6 +117,9 @@ function NotesList({
   onToggleFavorite: (id: string, isFavorite: boolean) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, space: NoteSpace) => void;
+  getUserReaction: (itemType: ReactionItemType, itemId: string) => ReactionValue | null;
+  getReactionCounts: (itemType: ReactionItemType, itemId: string) => Record<ReactionValue, number>;
+  onToggleReaction: (itemType: ReactionItemType, itemId: string, reaction: ReactionValue) => void;
 }) {
   if (notes.length === 0) {
     return null;
@@ -233,6 +241,14 @@ function NotesList({
                   ) : null}
                 </div>
               </div>
+
+              <ReactionBar
+                itemType="note"
+                itemId={note.id}
+                getUserReaction={getUserReaction}
+                getReactionCounts={getReactionCounts}
+                onToggleReaction={onToggleReaction}
+              />
             </motion.div>
           );
         })}
@@ -262,6 +278,15 @@ export default function Notes() {
   });
   const { messages, isLoaded: messagesLoaded, error: messagesError, sendMessage } = useDirectMessages({
     activePartnerId: connection?.partner_id ?? null,
+  });
+  const allReactionNoteIds = useMemo(
+    () => [...new Set([...privateNotes, ...betweenUsNotes, ...familyNotes].map((note) => note.id))],
+    [betweenUsNotes, familyNotes, privateNotes],
+  );
+  const allReactionMessageIds = useMemo(() => messages.map((message) => message.id), [messages]);
+  const { isAvailable: reactionsAvailable, getUserReaction, getReactionCounts, toggleReaction } = useReactions({
+    noteIds: allReactionNoteIds,
+    directMessageIds: allReactionMessageIds,
   });
 
   const promptFromQuery = useMemo(() => {
@@ -450,6 +475,11 @@ export default function Notes() {
                   `Messages here are private between sender and recipient only. They stay just between you and ${activePartnerLabel ?? partnerRole ?? "your connection"}.`}
               </p>
               <p className="mt-2 text-xs font-medium text-foreground">Writing as {profile?.role ?? "your profile"}</p>
+              {reactionsAvailable ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Reactions stay small and intentional here, so you can acknowledge a moment without turning it into a noisy feed.
+                </p>
+              ) : null}
             </div>
 
             {promptFromQuery && activeTab !== "direct" ? (
@@ -527,6 +557,9 @@ export default function Notes() {
                   onToggleFavorite={(id, isFavorite) => void toggleFavorite(id, isFavorite)}
                   onDelete={(id) => void deleteNote(id)}
                   onMove={(id, space) => void moveNoteToSpace(id, space)}
+                  getUserReaction={getUserReaction}
+                  getReactionCounts={getReactionCounts}
+                  onToggleReaction={(itemType, itemId, reaction) => void toggleReaction(itemType, itemId, reaction)}
                 />
               )}
             </>
@@ -556,6 +589,9 @@ export default function Notes() {
                   onToggleFavorite={(id, isFavorite) => void toggleFavorite(id, isFavorite)}
                   onDelete={(id) => void deleteNote(id)}
                   onMove={(id, space) => void moveNoteToSpace(id, space)}
+                  getUserReaction={getUserReaction}
+                  getReactionCounts={getReactionCounts}
+                  onToggleReaction={(itemType, itemId, reaction) => void toggleReaction(itemType, itemId, reaction)}
                 />
               )}
             </>
@@ -585,6 +621,9 @@ export default function Notes() {
                   onToggleFavorite={(id, isFavorite) => void toggleFavorite(id, isFavorite)}
                   onDelete={(id) => void deleteNote(id)}
                   onMove={(id, space) => void moveNoteToSpace(id, space)}
+                  getUserReaction={getUserReaction}
+                  getReactionCounts={getReactionCounts}
+                  onToggleReaction={(itemType, itemId, reaction) => void toggleReaction(itemType, itemId, reaction)}
                 />
               )}
             </>
@@ -623,6 +662,15 @@ export default function Notes() {
                             <span className="text-xs text-muted-foreground">{formatFriendlyTimestamp(message.created_at)}</span>
                           </div>
                           <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-foreground">{message.text}</p>
+                          {reactionsAvailable ? (
+                            <ReactionBar
+                              itemType="direct_message"
+                              itemId={message.id}
+                              getUserReaction={getUserReaction}
+                              getReactionCounts={getReactionCounts}
+                              onToggleReaction={(itemType, itemId, reaction) => void toggleReaction(itemType, itemId, reaction)}
+                            />
+                          ) : null}
                         </div>
                       </div>
                     );

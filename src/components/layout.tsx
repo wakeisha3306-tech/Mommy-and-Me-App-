@@ -1,9 +1,10 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Home, Sparkles, BookHeart, MessageCircleHeart, LogOut, Settings, Bell } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/auth-context";
 import { useNotifications } from "@/hooks/use-notifications";
+import { getGentleAlertsEnabled } from "@/lib/notifications";
 import { getUserLabel } from "@/lib/utils";
 
 interface LayoutProps {
@@ -25,6 +26,25 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
   const { session, profile, signOut } = useAuth();
   const { unreadCount } = useNotifications();
   const userLabel = getUserLabel(profile?.display_name, session?.user.email);
+  const [pulseBell, setPulseBell] = useState(false);
+  const [lastUnreadCount, setLastUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const gentleAlertsEnabled = getGentleAlertsEnabled();
+    if (!gentleAlertsEnabled) {
+      setLastUnreadCount(unreadCount);
+      return;
+    }
+
+    if (unreadCount > lastUnreadCount && lastUnreadCount >= 0) {
+      setPulseBell(true);
+      const timeoutId = window.setTimeout(() => setPulseBell(false), 1800);
+      setLastUnreadCount(unreadCount);
+      return () => window.clearTimeout(timeoutId);
+    }
+
+    setLastUnreadCount(unreadCount);
+  }, [lastUnreadCount, unreadCount]);
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center bg-background relative overflow-hidden">
@@ -41,7 +61,9 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
           <div className="flex items-center gap-2">
             <Link
               href="/notifications"
-              className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-white text-foreground transition-colors hover:bg-muted"
+              className={`relative inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-white text-foreground transition-colors hover:bg-muted ${
+                pulseBell ? "animate-pulse ring-2 ring-primary/20" : ""
+              }`}
             >
               <Bell className="h-4 w-4" />
               {unreadCount > 0 ? (

@@ -1,7 +1,10 @@
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import { Bell, CheckCheck, HeartHandshake, MessageCircleHeart, Sparkles, Users } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { ContentState } from "@/components/content-state";
 import { useNotifications } from "@/hooks/use-notifications";
+import { getGentleAlertsEnabled, setGentleAlertsEnabled } from "@/lib/notifications";
 import { formatFriendlyTimestamp } from "@/lib/utils";
 
 function getNotificationIcon(type: string) {
@@ -19,9 +22,31 @@ function getNotificationIcon(type: string) {
   }
 }
 
+function getNotificationDestination(type: string) {
+  switch (type) {
+    case "direct_message":
+      return "Opens Direct Messages";
+    case "shared_note":
+      return "Opens Between Us";
+    case "family_note":
+      return "Opens Family Space";
+    case "connection_joined":
+      return "Opens Connection";
+    case "mood_alert":
+    default:
+      return "Opens the right space";
+  }
+}
+
 export default function NotificationsPage() {
+  const [, navigate] = useLocation();
   const { notifications, unreadCount, isLoaded, error, preferences, markAsRead, markAllAsRead, updatePreferences } =
     useNotifications();
+  const [gentleAlertsEnabled, setGentleAlertsState] = useState(true);
+
+  useEffect(() => {
+    setGentleAlertsState(getGentleAlertsEnabled());
+  }, []);
 
   return (
     <Layout title="Notifications" subtitle="A soft inbox for connection updates and shared moments">
@@ -57,27 +82,49 @@ export default function NotificationsPage() {
               ["direct_messages", "Direct messages"],
               ["family_messages", "Family Space notes"],
               ["mood_alerts", "Mood alerts"],
+              ["gentle_alerts", "Gentle bell pulse"],
             ].map(([key, label]) => (
               <label key={key} className="flex items-center justify-between gap-3 rounded-[1.1rem] border border-border/70 bg-white/85 px-4 py-3">
                 <span className="text-sm font-medium text-foreground">{label}</span>
-                <button
-                  type="button"
-                  aria-pressed={Boolean(preferences?.[key as keyof typeof preferences])}
-                  onClick={() =>
-                    void updatePreferences({
-                      [key]: !preferences?.[key as keyof typeof preferences],
-                    })
-                  }
-                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-                    preferences?.[key as keyof typeof preferences] ? "bg-primary" : "bg-border"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                      preferences?.[key as keyof typeof preferences] ? "translate-x-6" : "translate-x-1"
+                {key === "gentle_alerts" ? (
+                  <button
+                    type="button"
+                    aria-pressed={gentleAlertsEnabled}
+                    onClick={() => {
+                      const next = !gentleAlertsEnabled;
+                      setGentleAlertsState(next);
+                      setGentleAlertsEnabled(next);
+                    }}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                      gentleAlertsEnabled ? "bg-primary" : "bg-border"
                     }`}
-                  />
-                </button>
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                        gentleAlertsEnabled ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    aria-pressed={Boolean(preferences?.[key as keyof typeof preferences])}
+                    onClick={() =>
+                      void updatePreferences({
+                        [key]: !preferences?.[key as keyof typeof preferences],
+                      })
+                    }
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                      preferences?.[key as keyof typeof preferences] ? "bg-primary" : "bg-border"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                        preferences?.[key as keyof typeof preferences] ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                )}
               </label>
             ))}
           </div>
@@ -97,13 +144,18 @@ export default function NotificationsPage() {
               {notifications.map((notification) => {
                 const Icon = getNotificationIcon(notification.type);
                 return (
-                  <a
+                  <button
+                    type="button"
                     key={notification.id}
-                    href={notification.href ?? "#"}
-                    onClick={() => void markAsRead(notification.id)}
+                    onClick={async () => {
+                      await markAsRead(notification.id);
+                      if (notification.href) {
+                        navigate(notification.href);
+                      }
+                    }}
                     className={`app-card-soft block p-4 transition-all duration-200 hover:-translate-y-0.5 ${
                       notification.read_at ? "opacity-80" : "border-primary/20 bg-primary/5"
-                    }`}
+                    } text-left w-full`}
                   >
                     <div className="flex items-start gap-3">
                       <div className="rounded-2xl bg-white/85 p-3 text-primary shadow-sm">
@@ -120,9 +172,12 @@ export default function NotificationsPage() {
                         </div>
                         <p className="mt-2 text-sm leading-6 text-muted-foreground">{notification.body}</p>
                         <p className="mt-3 text-xs text-muted-foreground">{formatFriendlyTimestamp(notification.created_at)}</p>
+                        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/75">
+                          {getNotificationDestination(notification.type)}
+                        </p>
                       </div>
                     </div>
-                  </a>
+                  </button>
                 );
               })}
             </div>

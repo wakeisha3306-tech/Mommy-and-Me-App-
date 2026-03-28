@@ -36,6 +36,8 @@ export interface NotificationRead {
   created_at: string;
 }
 
+export const GENTLE_ALERTS_STORAGE_KEY = "between-us-gentle-alerts";
+
 const DEFAULT_PREFERENCES: Omit<NotificationPreferences, "user_id" | "created_at" | "updated_at"> = {
   connection_updates: true,
   shared_notes: true,
@@ -52,4 +54,15 @@ export function getDefaultNotificationPreferences(userId: string): NotificationP
     updated_at: now,
     ...DEFAULT_PREFERENCES,
   };
+}
+
+export function getGentleAlertsEnabled() {
+  if (typeof window === "undefined") return true;
+  const stored = window.localStorage.getItem(GENTLE_ALERTS_STORAGE_KEY);
+  return stored === null ? true : stored === "true";
+}
+
+export function setGentleAlertsEnabled(enabled: boolean) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(GENTLE_ALERTS_STORAGE_KEY, String(enabled));
 }

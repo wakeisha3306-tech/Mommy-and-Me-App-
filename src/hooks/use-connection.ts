@@ -82,22 +82,20 @@ export function useConnection() {
       return { error: "You need a completed profile before you can create an invite." };
     }
 
+    if (profile.age_range === "Under 13" && profile.role === "Daughter") {
+      return { error: "For younger children, a parent needs to start the connection first." };
+    }
+
     if (connection) {
       return { error: "This account is already connected." };
     }
 
     if (activeInvite) {
-      console.debug("[connection] reusing active invite", { code: activeInvite.code });
       setError(null);
       return { error: null };
     }
 
     const code = crypto.randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase();
-    console.debug("[connection] creating invite", {
-      userId: session.user.id,
-      role: profile.role,
-      code,
-    });
     const { data, error } = await supabase
       .from("connection_invites")
       .insert({
@@ -114,7 +112,6 @@ export function useConnection() {
       return { error: error.message };
     }
 
-    console.debug("[connection] invite created", data);
     setActiveInvite(data);
     setError(null);
     return { error: null };
@@ -131,10 +128,6 @@ export function useConnection() {
         return { error: "Enter the invite code you received." };
       }
 
-      console.debug("[connection] accepting invite", {
-        userId: session.user.id,
-        code: trimmedCode,
-      });
       const { error } = await supabase.rpc("accept_connection_invite", {
         invite_code: trimmedCode,
       });
@@ -149,7 +142,6 @@ export function useConnection() {
         window.sessionStorage.removeItem("pending-connection-code");
       }
 
-      console.debug("[connection] invite accepted", { code: trimmedCode });
       await loadConnectionState();
       return { error: null };
     },
@@ -167,6 +159,11 @@ export function useConnection() {
     inviteLink,
     isLoaded,
     error,
+    canCreateInvite: !(profile?.age_range === "Under 13" && profile.role === "Daughter"),
+    inviteRestrictionMessage:
+      profile?.age_range === "Under 13" && profile.role === "Daughter"
+        ? "For younger children, Mom needs to start the connection first. You can still enter a code or link from her."
+        : null,
     partnerRole: getPartnerRole(profile?.role),
     createInvite,
     connectWithCode,

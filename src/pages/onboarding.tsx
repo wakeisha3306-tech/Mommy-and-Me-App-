@@ -2,16 +2,18 @@ import { FormEvent, useMemo, useState } from "react";
 import { HeartHandshake, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { type ProfileRole, useAuth } from "@/context/auth-context";
+import { type AgeRange, type ProfileRole, useAuth } from "@/context/auth-context";
 import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 import { deriveDisplayName } from "@/lib/utils";
 
 const ROLE_OPTIONS: ProfileRole[] = ["Mom", "Daughter"];
+const AGE_OPTIONS: AgeRange[] = ["Under 13", "13-17", "18+"];
 
 export default function OnboardingPage() {
-  const { session, completeProfile } = useAuth();
-  const [displayName, setDisplayName] = useState(() => deriveDisplayName(session?.user.email));
-  const [role, setRole] = useState<ProfileRole | null>(null);
+  const { session, profile, completeProfile } = useAuth();
+  const [displayName, setDisplayName] = useState(() => profile?.display_name ?? deriveDisplayName(session?.user.email));
+  const [role, setRole] = useState<ProfileRole | null>(profile?.role ?? null);
+  const [ageRange, setAgeRange] = useState<AgeRange | null>(profile?.age_range ?? null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,6 +21,15 @@ export default function OnboardingPage() {
     () => deriveDisplayName(session?.user.email).split(" ")[0] || "there",
     [session?.user.email],
   );
+
+  const ageMessage =
+    ageRange === "Under 13"
+      ? "For younger children, a parent needs to start the connection first. Your private space will still work the same."
+      : ageRange === "13-17"
+        ? "Either side can invite, and privacy stays strict by default."
+        : ageRange === "18+"
+          ? "You can use the full connection flow with the same private defaults."
+          : null;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -29,8 +40,13 @@ export default function OnboardingPage() {
       return;
     }
 
+    if (!ageRange) {
+      setError("Choose the age range that fits this account.");
+      return;
+    }
+
     setSubmitting(true);
-    const result = await completeProfile(displayName, role);
+    const result = await completeProfile(displayName, role, ageRange);
     setSubmitting(false);
 
     if (result.error) {
@@ -50,7 +66,7 @@ export default function OnboardingPage() {
             <h1 className="mt-2 font-serif text-4xl text-foreground">Make it feel like home</h1>
             <p className="mt-2 text-sm font-medium text-primary/75">{APP_TAGLINE}</p>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Tell us what to call you and whether this account belongs to Mom or Daughter so your space feels personal from the start.
+              Tell us what to call you, who this account belongs to, and the age range so we can keep connection setup gentle and safe.
             </p>
           </div>
 
@@ -87,12 +103,40 @@ export default function OnboardingPage() {
                         <span className="text-sm font-semibold text-foreground">{option}</span>
                       </div>
                       <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                        {option === "Mom" ? "A nurturing space for your reflections and notes." : "A gentle space made just for you."}
+                        {option === "Mom" ? "A nurturing space for your reflections and care." : "A gentle space made just for you."}
                       </p>
                     </button>
                   );
                 })}
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-sm font-medium text-foreground">Age range</span>
+              <div className="grid grid-cols-3 gap-3">
+                {AGE_OPTIONS.map((option) => {
+                  const selected = ageRange === option;
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setAgeRange(option)}
+                      className={`rounded-2xl border px-3 py-4 text-center transition-all duration-200 ${
+                        selected
+                          ? "border-primary bg-primary/10 shadow-sm"
+                          : "border-border bg-muted/25 hover:border-primary/40 hover:bg-primary/5"
+                      }`}
+                    >
+                      <span className="text-sm font-semibold text-foreground">{option}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {ageMessage ? (
+                <div className="rounded-2xl border border-primary/15 bg-primary/8 px-4 py-3 text-sm leading-6 text-muted-foreground">
+                  {ageMessage}
+                </div>
+              ) : null}
             </div>
 
             {error && (

@@ -4,12 +4,14 @@ import type { Session } from "@supabase/supabase-js";
 import { getAuthRedirectUrl, supabase } from "@/lib/supabase";
 
 export type ProfileRole = "Mom" | "Daughter";
+export type AgeRange = "Under 13" | "13-17" | "18+";
 
 export interface UserProfile {
   id: string;
   email: string;
   display_name: string;
   role: ProfileRole;
+  age_range: AgeRange | null;
   password_updated_at: string | null;
   created_at: string;
   updated_at: string;
@@ -23,6 +25,7 @@ interface AuthContextValue {
   needsOnboarding: boolean;
   recoveryMode: boolean;
   error: string | null;
+  notice: string | null;
   signUp: (
     email: string,
     password: string,
@@ -33,14 +36,42 @@ interface AuthContextValue {
   sendPasswordReset: (email: string, captchaToken?: string | null) => Promise<{ error: string | null }>;
   updatePassword: (password: string) => Promise<{ error: string | null }>;
   updateEmail: (email: string) => Promise<{ error: string | null }>;
-  completeProfile: (displayName: string, role: ProfileRole) => Promise<{ error: string | null }>;
+  completeProfile: (displayName: string, role: ProfileRole, ageRange: AgeRange) => Promise<{ error: string | null }>;
   reloadProfile: () => Promise<void>;
+  clearNotice: () => void;
   signOut: () => Promise<void>;
+}
+
+interface AccountSecurity {
+  user_id: string;
+  active_session_key: string | null;
+  last_session_started_at: string | null;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const PROFILE_SELECT = "id, email, display_name, role, password_updated_at, created_at, updated_at";
+const PROFILE_SELECT = "id, email, display_name, role, age_range, password_updated_at, created_at, updated_at";
+const SESSION_NOTICE =
+  "This account was opened on another device, so we signed you out here to keep your space private.";
+
+function getSessionStorageKey(userId: string) {
+  return `between-us-session-key:${userId}`;
+}
+
+function readLocalSessionKey(userId: string) {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(getSessionStorageKey(userId));
+}
+
+function writeLocalSessionKey(userId: string, value: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(getSessionStorageKey(userId), value);
+}
+
+function clearLocalSessionKey(userId?: string | null) {
+  if (typeof window === "undefined" || !userId) return;
+  window.localStorage.removeItem(getSessionStorageKey(userId));
+}
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
@@ -49,6 +80,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [profileLoading, setProfileLoading] = useState(false);
   const [recoveryMode, setRecoveryMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const fetchProfile = useCallback(async (userId: string) => {
     if (!supabase) return null;
@@ -66,6 +98,81 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     return data;
   }, []);
+
+  const upsertAccountSecurity = useCallback(async (userId: string, sessionKey: string) => {
+    if (!supabase) return { error: "Supabase is not configured yet." };
+
+    const { error: securityError } = await supabase.from("account_security").upsert({
+      user_id: userId,
+      active_session_key: sessionKey,
+      last_session_started_at: new Date().toISOString(),
+    });
+
+    return { error: securityError?.message ?? null };
+  }, []);
+
+  const validateActiveSession = useCallback(
+    async (userId: string) => {
+      if (!supabase) {
+        return { valid: false, message: "Supabase is not configured yet." };
+      }
+
+      const { data, error: securityError } = await supabase
+        .from("account_security")
+        .select("user_id, active_session_key, last_session_started_at")
+        .eq("user_id", userId)
+        .maybeSingle<AccountSecurity>();
+
+      if (securityError) {
+        return { valid: false, message: securityError.message };
+      }
+
+      const localSessionKey = readLocalSessionKey(userId);
+      const remoteSessionKey = data?.active_session_key ?? null;
+
+      if (!remoteSessionKey) {
+        const nextSessionKey = localSessionKey ?? crypto.randomUUID();
+        const result = await upsertAccountSecurity(userId, nextSessionKey);
+        if (result.error) {
+          return { valid: false, message: result.error };
+        }
+        writeLocalSessionKey(userId, nextSessionKey);
+        return { valid: true, message: null };
+      }
+
+      if (!localSessionKey) {
+        writeLocalSessionKey(userId, remoteSessionKey);
+        return { valid: true, message: null };
+      }
+
+      if (localSessionKey !== remoteSessionKey) {
+        return { valid: false, message: SESSION_NOTICE };
+      }
+
+      return { valid: true, message: null };
+    },
+    [upsertAccountSecurity],
+  );
+
+  const forceSingleDeviceSignOut = useCallback(
+    async (message: string) => {
+      const currentUserId = session?.user.id;
+
+      setSession(null);
+      setProfile(null);
+      setLoading(false);
+      setProfileLoading(false);
+      setRecoveryMode(false);
+      setNotice(message);
+      setError(null);
+      clearLocalSessionKey(currentUserId);
+
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+    },
+    [session?.user.id],
+  );
 
   useEffect(() => {
     if (!supabase) {
@@ -116,18 +223,57 @@ export function AuthProvider({ children }: PropsWithChildren) {
     let active = true;
     setProfileLoading(true);
 
-    fetchProfile(session.user.id).then((nextProfile) => {
+    (async () => {
+      const [nextProfile, sessionCheck] = await Promise.all([
+        fetchProfile(session.user.id),
+        validateActiveSession(session.user.id),
+      ]);
+
       if (!active) return;
+
+      if (!sessionCheck.valid) {
+        await forceSingleDeviceSignOut(sessionCheck.message ?? SESSION_NOTICE);
+        return;
+      }
+
       setProfile(nextProfile);
       setProfileLoading(false);
-    });
+    })();
 
     return () => {
       active = false;
     };
-  }, [fetchProfile, session?.user?.id]);
+  }, [fetchProfile, forceSingleDeviceSignOut, session?.user?.id, validateActiveSession]);
 
-  const needsOnboarding = Boolean(session?.user && !profileLoading && !profile);
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const verifySession = async () => {
+      const result = await validateActiveSession(session.user.id);
+      if (!result.valid) {
+        await forceSingleDeviceSignOut(result.message ?? SESSION_NOTICE);
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void verifySession();
+    }, 30000);
+
+    const handleFocus = () => {
+      void verifySession();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
+  }, [forceSingleDeviceSignOut, session?.user?.id, validateActiveSession]);
+
+  const needsOnboarding = Boolean(session?.user && !profileLoading && (!profile || !profile.age_range));
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -138,10 +284,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
       needsOnboarding,
       recoveryMode,
       error,
+      notice,
       async signUp(email, password, captchaToken) {
         if (!supabase) {
           return { error: "Supabase is not configured yet.", requiresEmailConfirmation: false };
         }
+
+        setNotice(null);
 
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
@@ -162,7 +311,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
           return { error: "Supabase is not configured yet." };
         }
 
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+        setNotice(null);
+
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
           options: {
@@ -170,7 +321,24 @@ export function AuthProvider({ children }: PropsWithChildren) {
           },
         });
 
-        return { error: signInError?.message ?? null };
+        if (signInError) {
+          return { error: signInError.message };
+        }
+
+        const userId = data.user?.id;
+        if (userId) {
+          const nextSessionKey = crypto.randomUUID();
+          const securityResult = await upsertAccountSecurity(userId, nextSessionKey);
+
+          if (securityResult.error) {
+            await supabase.auth.signOut();
+            return { error: securityResult.error };
+          }
+
+          writeLocalSessionKey(userId, nextSessionKey);
+        }
+
+        return { error: null };
       },
       async resendConfirmation(email) {
         if (!supabase) {
@@ -248,7 +416,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
         return { error: updateError?.message ?? null };
       },
-      async completeProfile(displayName, role) {
+      async completeProfile(displayName, role, ageRange) {
         if (!supabase || !session?.user) {
           return { error: "You need to be signed in to save your profile." };
         }
@@ -265,6 +433,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
             email: session.user.email ?? "",
             display_name: trimmedName,
             role,
+            age_range: ageRange,
           })
           .select(PROFILE_SELECT)
           .single<UserProfile>();
@@ -285,11 +454,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setProfile(nextProfile);
         setProfileLoading(false);
       },
+      clearNotice() {
+        setNotice(null);
+      },
       async signOut() {
         if (!supabase) return;
+        clearLocalSessionKey(session?.user?.id);
         setSession(null);
         setProfile(null);
         setError(null);
+        setNotice(null);
         setLoading(false);
         setProfileLoading(false);
         setRecoveryMode(false);
@@ -300,7 +474,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
         }
       },
     }),
-    [error, fetchProfile, loading, needsOnboarding, profile, profileLoading, recoveryMode, session],
+    [
+      error,
+      fetchProfile,
+      loading,
+      needsOnboarding,
+      notice,
+      profile,
+      profileLoading,
+      recoveryMode,
+      session,
+      upsertAccountSecurity,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

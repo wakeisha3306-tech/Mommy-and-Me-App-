@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import {
@@ -16,6 +16,7 @@ import {
   Send,
   Laugh,
   Share2,
+  X,
 } from "lucide-react";
 import { ShareMomentDialog } from "@/components/share-moment-dialog";
 import { format } from "date-fns";
@@ -25,6 +26,7 @@ import { useJournal } from "@/hooks/use-journal";
 import { useAffirmations } from "@/hooks/use-affirmations";
 import { useNotes } from "@/hooks/use-notes";
 import { useRealMoments } from "@/hooks/use-real-moments";
+import { useDirectMessages } from "@/hooks/use-direct-messages";
 import { getDailyAffirmation } from "@/lib/affirmations";
 import { APP_NAME, APP_TAGLINE, SHARE_CARD_TAGLINE } from "@/lib/brand";
 import type { ShareCardContent } from "@/lib/share-card";
@@ -162,7 +164,8 @@ export default function Home() {
   const { session, profile } = useAuth();
   const { entries, isLoaded: journalLoaded } = useJournal();
   const { affirmations, isLoaded: affirmationsLoaded } = useAffirmations();
-  const { notes, isLoaded: notesLoaded } = useNotes();
+  const { privateNotes, sharedNotes, receivedSharedNotes, isLoaded: notesLoaded } = useNotes();
+  const { receivedMessages, isLoaded: messagesLoaded } = useDirectMessages();
   const { moments, isLoaded: momentsLoaded, error: momentsError, addMoment } = useRealMoments();
   const affirmation = useMemo(getDailyAffirmation, []);
   const ritual = useMemo(getDailyRitual, []);
@@ -174,7 +177,7 @@ export default function Home() {
   );
   const todayLabel = useMemo(() => format(new Date(), "EEEE, MMMM d"), []);
   const allMomentsLoaded = journalLoaded && affirmationsLoaded && notesLoaded;
-  const totalMoments = entries.length + affirmations.length + notes.length;
+  const totalMoments = entries.length + affirmations.length + privateNotes.length + sharedNotes.length;
   const favoriteMoments = useMemo(() => {
     const favorites = [
       ...entries
@@ -197,7 +200,7 @@ export default function Home() {
           meta: savedAffirmation.source === "custom" ? "Custom" : "Saved from library",
           created_at: savedAffirmation.created_at,
         })),
-      ...notes
+      ...[...privateNotes, ...sharedNotes]
         .filter((note) => note.is_favorite)
         .map((note) => ({
           id: `note-${note.id}`,
@@ -212,26 +215,65 @@ export default function Home() {
     return favorites
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 4);
-  }, [affirmations, entries, notes]);
+  }, [affirmations, entries, privateNotes, sharedNotes]);
 
   const latestMoment = useMemo(() => {
     const items = [
       entries[0] ? { label: "Journal", created_at: entries[0].created_at } : null,
       affirmations[0] ? { label: "Affirmation", created_at: affirmations[0].created_at } : null,
-      notes[0] ? { label: "Note", created_at: notes[0].created_at } : null,
+      [...privateNotes, ...sharedNotes]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+        ? {
+            label: "Note",
+            created_at: [...privateNotes, ...sharedNotes].sort(
+              (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+            )[0].created_at,
+          }
+        : null,
     ].filter(Boolean) as Array<{ label: string; created_at: string }>;
 
     return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] ?? null;
-  }, [affirmations, entries, notes]);
+  }, [affirmations, entries, privateNotes, sharedNotes]);
 
   const [quoteIndex, setQuoteIndex] = useState(0);
   const [momentDraft, setMomentDraft] = useState("");
   const [momentStatus, setMomentStatus] = useState<string | null>(null);
   const [isSavingMoment, setIsSavingMoment] = useState(false);
   const [shareItem, setShareItem] = useState<ShareCardContent | null>(null);
+  const [dismissedInboxItemId, setDismissedInboxItemId] = useState<string | null>(null);
   const prevQuote = () => setQuoteIndex((i) => (i - 1 + QUOTES.length) % QUOTES.length);
   const nextQuote = () => setQuoteIndex((i) => (i + 1) % QUOTES.length);
   const recentMoments = moments.slice(0, 3);
+
+  const latestIncomingItem = useMemo(() => {
+    const items = [
+      ...receivedSharedNotes.map((note) => ({
+        id: `shared-${note.id}`,
+        created_at: note.created_at,
+        href: "/notes?tab=shared",
+        message: `You received something from ${note.author} 💛`,
+      })),
+      ...receivedMessages.map((message) => ({
+        id: `dm-${message.id}`,
+        created_at: message.created_at,
+        href: "/notes?tab=direct",
+        message: `You received a message from ${message.sender_role} 💛`,
+      })),
+    ];
+
+    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] ?? null;
+  }, [receivedMessages, receivedSharedNotes]);
+
+  useEffect(() => {
+    if (!latestIncomingItem || typeof window === "undefined") return;
+    const storedDismissedId = window.localStorage.getItem("between-us-last-dismissed-inbox-item");
+    setDismissedInboxItemId(storedDismissedId);
+  }, [latestIncomingItem]);
+
+  const activeInboxBanner =
+    notesLoaded && messagesLoaded && latestIncomingItem && latestIncomingItem.id !== dismissedInboxItemId
+      ? latestIncomingItem
+      : null;
 
   const saveMoment = async () => {
     const trimmedMoment = momentDraft.trim();
@@ -264,6 +306,35 @@ export default function Home() {
     <Layout>
       <div className="section-stack pb-6">
         <ShareMomentDialog item={shareItem} onClose={() => setShareItem(null)} />
+        {activeInboxBanner ? (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="app-card-soft flex items-center justify-between gap-3 border-primary/15 bg-primary/8 px-4 py-3"
+          >
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/75">A gentle update</p>
+              <p className="mt-1 text-sm text-foreground">{activeInboxBanner.message}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link href={activeInboxBanner.href}>
+                <span className="cursor-pointer text-sm font-semibold text-primary">Open</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    window.localStorage.setItem("between-us-last-dismissed-inbox-item", activeInboxBanner.id);
+                  }
+                  setDismissedInboxItemId(activeInboxBanner.id);
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </motion.div>
+        ) : null}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -380,7 +451,7 @@ export default function Home() {
             </div>
             <div className="app-stat-tile">
               <MessagesSquare className="h-4 w-4 text-primary" />
-              <p className="mt-3 text-2xl font-serif text-foreground">{notes.length}</p>
+              <p className="mt-3 text-2xl font-serif text-foreground">{privateNotes.length + sharedNotes.length}</p>
               <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">Notes</p>
             </div>
           </div>

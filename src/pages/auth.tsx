@@ -14,7 +14,7 @@ const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim();
 const isCaptchaConfigured = Boolean(turnstileSiteKey);
 
 export default function AuthPage() {
-  const { signIn, signUp, resendConfirmation, sendPasswordReset, error: authError } = useAuth();
+  const { signIn, signUp, resendConfirmation, sendPasswordReset, error: authError, notice, clearNotice } = useAuth();
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,6 +45,7 @@ export default function AuthPage() {
     setSubmitting(true);
     setError(null);
     setMessage(null);
+    clearNotice();
 
     if (password.length < MIN_PASSWORD_LENGTH) {
       setSubmitting(false);
@@ -102,6 +103,7 @@ export default function AuthPage() {
 
     setResending(true);
     setError(null);
+    clearNotice();
     const result = await resendConfirmation(email.trim());
     setResending(false);
 
@@ -118,6 +120,7 @@ export default function AuthPage() {
     setSubmitting(true);
     setError(null);
     setMessage(null);
+    clearNotice();
 
     if (!email.trim()) {
       setSubmitting(false);
@@ -189,6 +192,7 @@ export default function AuthPage() {
                   setMode("login");
                   setError(null);
                   setMessage(null);
+                  clearNotice();
                   resetCaptcha();
                 }}
                 className="h-11 w-full rounded-xl text-sm font-semibold"
@@ -213,6 +217,7 @@ export default function AuthPage() {
                 setShowForgotPassword(false);
                 setError(null);
                 setMessage(null);
+                clearNotice();
               }}
               className="mb-5 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
@@ -343,6 +348,12 @@ export default function AuthPage() {
                 {(error || authError) && (
                   <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                     {error ?? authError}
+                  </div>
+                )}
+
+                {notice && (
+                  <div className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-primary">
+                    {notice}
                   </div>
                 )}
 

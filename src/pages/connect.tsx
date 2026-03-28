@@ -8,8 +8,18 @@ import { useConnection } from "@/hooks/use-connection";
 import { formatFriendlyTimestamp } from "@/lib/utils";
 
 export default function ConnectPage() {
-  const { connection, activeInvite, inviteLink, isLoaded, error, partnerRole, createInvite, connectWithCode } =
-    useConnection();
+  const {
+    connection,
+    activeInvite,
+    inviteLink,
+    isLoaded,
+    error,
+    partnerRole,
+    canCreateInvite,
+    inviteRestrictionMessage,
+    createInvite,
+    connectWithCode,
+  } = useConnection();
   const initialCode = useMemo(() => {
     if (typeof window === "undefined") return "";
     const urlCode = new URLSearchParams(window.location.search).get("code")?.trim().toUpperCase();
@@ -163,9 +173,15 @@ export default function ConnectPage() {
                   </div>
                 ) : (
                   <div className="mt-4">
-                    <Button type="button" onClick={() => void handleCreateInvite()} disabled={creatingInvite} className="app-button-primary">
-                      {creatingInvite ? "Creating..." : "Create invite"}
-                    </Button>
+                    {canCreateInvite ? (
+                      <Button type="button" onClick={() => void handleCreateInvite()} disabled={creatingInvite} className="app-button-primary">
+                        {creatingInvite ? "Creating..." : "Create invite"}
+                      </Button>
+                    ) : (
+                      <div className="rounded-[1.15rem] border border-primary/15 bg-primary/8 px-4 py-3 text-sm leading-6 text-muted-foreground">
+                        {inviteRestrictionMessage}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

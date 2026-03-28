@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Trash2, MessageCircleHeart, Flower, Heart } from "lucide-react";
 import { Layout } from "@/components/layout";
@@ -36,8 +36,20 @@ const QUICK_NOTES = [
 
 export default function Notes() {
   const { notes, isLoaded, error, addNote, deleteNote, toggleFavorite } = useNotes();
+  const promptFromQuery = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("prompt")?.trim() ?? "";
+  }, []);
   const [text, setText] = useState("");
   const [author, setAuthor] = useState<NoteAuthor>("Mom");
+
+  useEffect(() => {
+    if (!promptFromQuery) return;
+    setText((current) => {
+      if (current.trim()) return current;
+      return `${promptFromQuery}\n\n`;
+    });
+  }, [promptFromQuery]);
 
   const handleSend = () => {
     if (!text.trim()) return;
@@ -91,6 +103,13 @@ export default function Notes() {
           </div>
 
           <div className="p-5">
+            {promptFromQuery && (
+              <div className="mb-4 rounded-[1.2rem] border border-primary/15 bg-primary/8 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/80">Connection prompt</p>
+                <p className="mt-2 text-sm leading-6 text-foreground">{promptFromQuery}</p>
+              </div>
+            )}
+
             <p className="text-xs text-muted-foreground mb-3">Quick picks:</p>
             <div className="flex flex-wrap gap-2 mb-4">
               {QUICK_NOTES.map((quickNote) => (

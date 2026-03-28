@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Sparkles, BookHeart, MessageCircleHeart, ChevronRight, ChevronLeft, HeartHandshake, NotebookPen, MessagesSquare, SunMedium, Heart } from "lucide-react";
+import { Sparkles, BookHeart, MessageCircleHeart, ChevronRight, ChevronLeft, HeartHandshake, NotebookPen, MessagesSquare, SunMedium, Heart, PenSquare, Send } from "lucide-react";
 import { format } from "date-fns";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@/context/auth-context";
@@ -133,9 +133,25 @@ const DAILY_RITUALS = [
   },
 ];
 
+const DAILY_CONNECTION_PROMPTS = [
+  "What is one thing you want each other to remember today?",
+  "What made you feel most loved lately?",
+  "What would make today feel a little softer for you?",
+  "What is one small win you want to celebrate together?",
+  "What do you want to say thank you for today?",
+  "What feeling deserves a little more space right now?",
+  "What is one memory you never want to lose?",
+  "What would help you feel supported today?",
+];
+
 function getDailyRitual() {
   const dayIndex = Math.floor(Date.now() / 86400000) % DAILY_RITUALS.length;
   return DAILY_RITUALS[dayIndex];
+}
+
+function getDailyConnectionPrompt() {
+  const dayIndex = Math.floor(Date.now() / 86400000) % DAILY_CONNECTION_PROMPTS.length;
+  return DAILY_CONNECTION_PROMPTS[dayIndex];
 }
 
 export default function Home() {
@@ -145,6 +161,7 @@ export default function Home() {
   const { notes, isLoaded: notesLoaded } = useNotes();
   const affirmation = useMemo(getDailyAffirmation, []);
   const ritual = useMemo(getDailyRitual, []);
+  const connectionPrompt = useMemo(getDailyConnectionPrompt, []);
   const greeting = useMemo(getGreeting, []);
   const displayName = useMemo(
     () => getUserLabel(profile?.display_name, session?.user.email),
@@ -344,6 +361,47 @@ export default function Home() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, delay: 0.2 }}
+          className="app-feature-card p-5"
+        >
+          <div className="relative z-10">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Daily Connection Prompt</p>
+                <h2 className="mt-2 text-2xl font-serif text-foreground">A little question to bring you closer</h2>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/80 text-primary shadow-sm">
+                <HeartHandshake className="h-5 w-5" />
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-[1.45rem] border border-white/75 bg-white/84 p-5 shadow-sm">
+              <p className="text-lg font-serif leading-relaxed text-foreground">"{connectionPrompt}"</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                Answer it in your journal, or send it as a note to keep the conversation going.
+              </p>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <Link href={`/journal?prompt=${encodeURIComponent(connectionPrompt)}`}>
+                <div className="flex cursor-pointer items-center justify-center gap-2 rounded-[1.35rem] border border-primary/15 bg-white/82 px-4 py-3 text-sm font-semibold text-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-white">
+                  <PenSquare className="h-4 w-4 text-primary" />
+                  Reflect in Journal
+                </div>
+              </Link>
+              <Link href={`/notes?prompt=${encodeURIComponent(connectionPrompt)}`}>
+                <div className="flex cursor-pointer items-center justify-center gap-2 rounded-[1.35rem] border border-primary/15 bg-white/82 px-4 py-3 text-sm font-semibold text-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-white">
+                  <Send className="h-4 w-4 text-primary" />
+                  Turn into a Note
+                </div>
+              </Link>
+            </div>
+          </div>
+        </motion.section>
+
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, delay: 0.24 }}
           className="app-card p-5"
         >
           <div className="flex items-center justify-between gap-3">
@@ -390,7 +448,7 @@ export default function Home() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.26 }}
         >
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest px-1">Our Spaces</p>
         </motion.div>
@@ -398,7 +456,7 @@ export default function Home() {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.25 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
           className="flex flex-col gap-3"
         >
           {QUICK_LINKS.map(({ href, icon: Icon, label, description, color, activeBg }, i) => (
@@ -427,7 +485,7 @@ export default function Home() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
+          transition={{ delay: 0.66 }}
           className="app-card p-6"
         >
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">Words of Wisdom</p>

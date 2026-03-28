@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { PenLine, Trash2, Heart, Flower } from "lucide-react";
 import { Layout } from "@/components/layout";
@@ -31,9 +31,21 @@ const MOODS = [
 
 export default function Journal() {
   const { entries, addEntry, deleteEntry, toggleFavorite, isLoaded } = useJournal();
+  const promptFromQuery = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("prompt")?.trim() ?? "";
+  }, []);
   const [newEntry, setNewEntry] = useState("");
   const [author, setAuthor] = useState<Author>("Mom");
   const [mood, setMood] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!promptFromQuery) return;
+    setNewEntry((current) => {
+      if (current.trim()) return current;
+      return `${promptFromQuery}\n\n`;
+    });
+  }, [promptFromQuery]);
 
   const handleSave = () => {
     if (!newEntry.trim()) return;
@@ -83,6 +95,13 @@ export default function Journal() {
           </div>
 
           <div className="p-5">
+            {promptFromQuery && (
+              <div className="mb-4 rounded-[1.2rem] border border-primary/15 bg-primary/8 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/80">Connection prompt</p>
+                <p className="mt-2 text-sm leading-6 text-foreground">{promptFromQuery}</p>
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-2 mb-4">
               {MOODS.map((nextMood) => {
                 const selectedMood = `${nextMood.emoji} ${nextMood.label}`;

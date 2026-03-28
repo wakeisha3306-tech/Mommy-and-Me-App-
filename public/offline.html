@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#d97d91" />
+    <title>Between Us</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f8f1ed;
+        --card: rgba(255, 255, 255, 0.92);
+        --border: #eedfda;
+        --text: #4e3439;
+        --muted: #85646a;
+        --primary: #d97d91;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        font-family: "Quicksand", ui-sans-serif, sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(217, 125, 145, 0.14), transparent 28%),
+          radial-gradient(circle at bottom right, rgba(240, 196, 141, 0.18), transparent 30%),
+          var(--bg);
+        color: var(--text);
+      }
+
+      .card {
+        width: min(100%, 420px);
+        border: 1px solid var(--border);
+        border-radius: 30px;
+        background: var(--card);
+        padding: 32px 28px;
+        box-shadow: 0 24px 50px -30px rgba(78, 52, 57, 0.35);
+        text-align: center;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 18px;
+        width: 64px;
+        height: 64px;
+        border-radius: 20px;
+        background: linear-gradient(145deg, #f5ddd4, #d97d91);
+        color: white;
+        font-size: 28px;
+      }
+
+      h1 {
+        margin: 0;
+        font: 500 2rem/1.15 "Playfair Display", Georgia, serif;
+      }
+
+      p {
+        margin: 14px 0 0;
+        font-size: 0.98rem;
+        line-height: 1.75;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <div class="badge">B</div>
+      <h1>Between Us</h1>
+      <p>A space just for us.</p>
+      <p>You are offline right now, but the app shell is still here waiting for you.</p>
+    </main>
+  </body>
+</html>

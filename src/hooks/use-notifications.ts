@@ -76,178 +76,206 @@ export function useNotifications() {
     setError(null);
 
     const userId = session.user.id;
-    const [
-      prefResult,
-      readResult,
-      connectionResult,
-      betweenUsResult,
-      familyResult,
-      messageResult,
-      moodResult,
-    ] = await Promise.all([
-      supabase.from("notification_preferences").select(PREF_SELECT).eq("user_id", userId).maybeSingle<NotificationPreferences>(),
-      supabase.from("notification_reads").select(READ_SELECT).eq("user_id", userId),
-      supabase.from("connections").select("id, partner_id, created_at").eq("user_id", userId).order("created_at", { ascending: false }),
-      supabase
-        .from("notes")
-        .select("id, user_id, author, text, visibility, created_at")
-        .eq("visibility", "between_us")
-        .neq("user_id", userId)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("notes")
-        .select("id, user_id, author, text, visibility, created_at")
-        .eq("visibility", "family")
-        .neq("user_id", userId)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("direct_messages")
-        .select("id, sender_id, sender_role, text, created_at")
-        .eq("recipient_id", userId)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("mood_support_alerts")
-        .select("id, sender_id, sender_role, created_at, viewed_at")
-        .eq("recipient_id", userId)
-        .order("created_at", { ascending: false }),
-    ]);
 
-    const nextError =
-      prefResult.error ??
-      readResult.error ??
-      connectionResult.error ??
-      betweenUsResult.error ??
-      familyResult.error ??
-      messageResult.error ??
-      moodResult.error;
+    try {
+      const [
+        prefResult,
+        readResult,
+        connectionResult,
+        betweenUsResult,
+        familyResult,
+        messageResult,
+        moodResult,
+      ] = await Promise.all([
+        supabase.from("notification_preferences").select(PREF_SELECT).eq("user_id", userId).maybeSingle<NotificationPreferences>(),
+        supabase.from("notification_reads").select(READ_SELECT).eq("user_id", userId),
+        supabase.from("connections").select("id, partner_id, created_at").eq("user_id", userId).order("created_at", { ascending: false }),
+        supabase
+          .from("notes")
+          .select("id, user_id, author, text, visibility, created_at")
+          .eq("visibility", "between_us")
+          .neq("user_id", userId)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("notes")
+          .select("id, user_id, author, text, visibility, created_at")
+          .eq("visibility", "family")
+          .neq("user_id", userId)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("direct_messages")
+          .select("id, sender_id, sender_role, text, created_at")
+          .eq("recipient_id", userId)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("mood_support_alerts")
+          .select("id, sender_id, sender_role, created_at, viewed_at")
+          .eq("recipient_id", userId)
+          .order("created_at", { ascending: false }),
+      ]);
 
-    if (nextError) {
+      const nextError =
+        prefResult.error ??
+        readResult.error ??
+        connectionResult.error ??
+        betweenUsResult.error ??
+        familyResult.error ??
+        messageResult.error ??
+        moodResult.error;
+
+      if (nextError) {
+        console.error("[notifications] load failed", {
+          userId,
+          message: nextError.message,
+        });
+        setNotifications([]);
+        setPreferences(getDefaultNotificationPreferences(userId));
+        setError(nextError.message);
+        setIsLoaded(true);
+        return;
+      }
+
+      const reads = (readResult.data ?? []) as NotificationRead[];
+      const readLookup = new Map(reads.map((item) => [`${item.source_type}:${item.source_id}`, item]));
+      const connections = (connectionResult.data ?? []) as ConnectionRow[];
+      const betweenUsNotes = (betweenUsResult.data ?? []) as NoteRow[];
+      const familyNotes = (familyResult.data ?? []) as NoteRow[];
+      const directMessages = (messageResult.data ?? []) as MessageRow[];
+      const moodAlerts = (moodResult.data ?? []) as MoodAlertRow[];
+
+      const partnerIds = [
+        ...new Set([
+          ...connections.map((item) => item.partner_id),
+          ...betweenUsNotes.map((item) => item.user_id),
+          ...familyNotes.map((item) => item.user_id),
+          ...directMessages.map((item) => item.sender_id),
+          ...moodAlerts.map((item) => item.sender_id),
+        ]),
+      ];
+
+      let profileLookup = new Map<string, ProfileRow>();
+      if (partnerIds.length > 0) {
+        const { data: profileRows, error: profileError } = await supabase
+          .from("profiles")
+          .select("id, display_name, email")
+          .in("id", partnerIds);
+
+        if (profileError) {
+          console.error("[notifications] partner profile lookup failed", {
+            userId,
+            message: profileError.message,
+          });
+          setError(profileError.message);
+        } else {
+          profileLookup = new Map((profileRows ?? []).map((item) => [item.id, item as ProfileRow]));
+        }
+      }
+
+      const derivedNotifications: AppNotification[] = [
+        ...connections.map((connection) => {
+          const partner = profileLookup.get(connection.partner_id);
+          const read = readLookup.get(`connection_joined:${connection.partner_id}`);
+          return {
+            id: `connection_joined:${connection.partner_id}`,
+            source_id: connection.partner_id,
+            type: "connection_joined" as const,
+            title: `You're connected with ${getUserLabel(partner?.display_name, partner?.email)}`,
+            body: "Your private spaces are linked now, and you can start writing together gently.",
+            href: "/connect",
+            read_at: read?.read_at ?? null,
+            created_at: connection.created_at,
+          };
+        }),
+        ...betweenUsNotes.map((note) => {
+          const read = readLookup.get(`shared_note:${note.id}`);
+          return {
+            id: `shared_note:${note.id}`,
+            source_id: note.id,
+            type: "shared_note" as const,
+            title: `A note from ${note.author}`,
+            body: preview(note.text),
+            href: `/notes?tab=between_us&partner=${encodeURIComponent(note.user_id)}`,
+            read_at: read?.read_at ?? null,
+            created_at: note.created_at,
+          };
+        }),
+        ...familyNotes.map((note) => {
+          const sender = profileLookup.get(note.user_id);
+          const read = readLookup.get(`family_note:${note.id}`);
+          return {
+            id: `family_note:${note.id}`,
+            source_id: note.id,
+            type: "family_note" as const,
+            title: `A family note from ${getUserLabel(sender?.display_name, sender?.email)}`,
+            body: preview(note.text),
+            href: "/notes?tab=family",
+            read_at: read?.read_at ?? null,
+            created_at: note.created_at,
+          };
+        }),
+        ...directMessages.map((message) => {
+          const read = readLookup.get(`direct_message:${message.id}`);
+          return {
+            id: `direct_message:${message.id}`,
+            source_id: message.id,
+            type: "direct_message" as const,
+            title: `A private message from ${message.sender_role}`,
+            body: preview(message.text),
+            href: `/notes?tab=direct&partner=${encodeURIComponent(message.sender_id)}`,
+            read_at: read?.read_at ?? null,
+            created_at: message.created_at,
+          };
+        }),
+        ...moodAlerts.map((alert) => {
+          const sender = profileLookup.get(alert.sender_id);
+          const read = readLookup.get(`mood_alert:${alert.id}`);
+          return {
+            id: `mood_alert:${alert.id}`,
+            source_id: alert.id,
+            type: "mood_alert" as const,
+            title: "She might need you today 💛",
+            body: `${getUserLabel(sender?.display_name, sender?.email)} shared how she's feeling today.`,
+            href: `/notes?tab=direct&partner=${encodeURIComponent(alert.sender_id)}`,
+            read_at: alert.viewed_at ?? read?.read_at ?? null,
+            created_at: alert.created_at,
+          };
+        }),
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      const nextPreferences = prefResult.data ?? getDefaultNotificationPreferences(userId);
+      const filteredNotifications = derivedNotifications.filter((item) => {
+        if (item.type === "connection_joined") return nextPreferences.connection_updates;
+        if (item.type === "shared_note") return nextPreferences.shared_notes;
+        if (item.type === "direct_message") return nextPreferences.direct_messages;
+        if (item.type === "family_note") return nextPreferences.family_messages;
+        if (item.type === "mood_alert") return nextPreferences.mood_alerts;
+        return true;
+      });
+
+      console.debug("[notifications] load success", {
+        userId,
+        connections: connections.length,
+        betweenUs: betweenUsNotes.length,
+        family: familyNotes.length,
+        directMessages: directMessages.length,
+        moodAlerts: moodAlerts.length,
+        unread: filteredNotifications.filter((item) => !item.read_at).length,
+      });
+
+      setNotifications(filteredNotifications);
+      setPreferences(nextPreferences);
+      setIsLoaded(true);
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : "We couldn't load notifications right now.";
+      console.error("[notifications] unexpected load error", {
+        userId,
+        message,
+      });
       setNotifications([]);
       setPreferences(getDefaultNotificationPreferences(userId));
-      setError(nextError.message);
+      setError(message);
       setIsLoaded(true);
-      return;
     }
-
-    const reads = (readResult.data ?? []) as NotificationRead[];
-    const readLookup = new Map(reads.map((item) => [`${item.source_type}:${item.source_id}`, item]));
-    const connections = (connectionResult.data ?? []) as ConnectionRow[];
-    const betweenUsNotes = (betweenUsResult.data ?? []) as NoteRow[];
-    const familyNotes = (familyResult.data ?? []) as NoteRow[];
-    const directMessages = (messageResult.data ?? []) as MessageRow[];
-    const moodAlerts = (moodResult.data ?? []) as MoodAlertRow[];
-
-    const partnerIds = [
-      ...new Set([
-        ...connections.map((item) => item.partner_id),
-        ...betweenUsNotes.map((item) => item.user_id),
-        ...familyNotes.map((item) => item.user_id),
-        ...directMessages.map((item) => item.sender_id),
-        ...moodAlerts.map((item) => item.sender_id),
-      ]),
-    ];
-
-    let profileLookup = new Map<string, ProfileRow>();
-    if (partnerIds.length > 0) {
-      const { data: profileRows, error: profileError } = await supabase
-        .from("profiles")
-        .select("id, display_name, email")
-        .in("id", partnerIds);
-
-      if (profileError) {
-        setError(profileError.message);
-      } else {
-        profileLookup = new Map((profileRows ?? []).map((item) => [item.id, item as ProfileRow]));
-      }
-    }
-
-    const derivedNotifications: AppNotification[] = [
-      ...connections.map((connection) => {
-        const partner = profileLookup.get(connection.partner_id);
-        const read = readLookup.get(`connection_joined:${connection.partner_id}`);
-        return {
-          id: `connection_joined:${connection.partner_id}`,
-          source_id: connection.partner_id,
-          type: "connection_joined" as const,
-          title: `You're connected with ${getUserLabel(partner?.display_name, partner?.email)}`,
-          body: "Your private spaces are linked now, and you can start writing together gently.",
-          href: "/connect",
-          read_at: read?.read_at ?? null,
-          created_at: connection.created_at,
-        };
-      }),
-      ...betweenUsNotes.map((note) => {
-        const sender = profileLookup.get(note.user_id);
-        const read = readLookup.get(`shared_note:${note.id}`);
-        return {
-          id: `shared_note:${note.id}`,
-          source_id: note.id,
-          type: "shared_note" as const,
-          title: `A note from ${note.author}`,
-          body: preview(note.text),
-          href: `/notes?tab=between_us&partner=${encodeURIComponent(note.user_id)}`,
-          read_at: read?.read_at ?? null,
-          created_at: note.created_at,
-        };
-      }),
-      ...familyNotes.map((note) => {
-        const sender = profileLookup.get(note.user_id);
-        const read = readLookup.get(`family_note:${note.id}`);
-        return {
-          id: `family_note:${note.id}`,
-          source_id: note.id,
-          type: "family_note" as const,
-          title: `A family note from ${getUserLabel(sender?.display_name, sender?.email)}`,
-          body: preview(note.text),
-          href: "/notes?tab=family",
-          read_at: read?.read_at ?? null,
-          created_at: note.created_at,
-        };
-      }),
-      ...directMessages.map((message) => {
-        const sender = profileLookup.get(message.sender_id);
-        const read = readLookup.get(`direct_message:${message.id}`);
-        return {
-          id: `direct_message:${message.id}`,
-          source_id: message.id,
-          type: "direct_message" as const,
-          title: `A private message from ${message.sender_role}`,
-          body: preview(message.text),
-          href: `/notes?tab=direct&partner=${encodeURIComponent(message.sender_id)}`,
-          read_at: read?.read_at ?? null,
-          created_at: message.created_at,
-        };
-      }),
-      ...moodAlerts.map((alert) => {
-        const sender = profileLookup.get(alert.sender_id);
-        const read = readLookup.get(`mood_alert:${alert.id}`);
-        return {
-          id: `mood_alert:${alert.id}`,
-          source_id: alert.id,
-          type: "mood_alert" as const,
-          title: "She might need you today 💛",
-          body: `${getUserLabel(sender?.display_name, sender?.email)} shared how she's feeling today.`,
-          href: `/notes?tab=direct&partner=${encodeURIComponent(alert.sender_id)}`,
-          read_at: alert.viewed_at ?? read?.read_at ?? null,
-          created_at: alert.created_at,
-        };
-      }),
-    ]
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-    const nextPreferences = prefResult.data ?? getDefaultNotificationPreferences(userId);
-    const filteredNotifications = derivedNotifications.filter((item) => {
-      if (item.type === "connection_joined") return nextPreferences.connection_updates;
-      if (item.type === "shared_note") return nextPreferences.shared_notes;
-      if (item.type === "direct_message") return nextPreferences.direct_messages;
-      if (item.type === "family_note") return nextPreferences.family_messages;
-      if (item.type === "mood_alert") return nextPreferences.mood_alerts;
-      return true;
-    });
-
-    setNotifications(filteredNotifications);
-    setPreferences(nextPreferences);
-    setIsLoaded(true);
   }, [session?.user.id]);
 
   useEffect(() => {

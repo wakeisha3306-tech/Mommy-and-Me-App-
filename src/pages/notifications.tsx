@@ -20,7 +20,7 @@ function getNotificationIcon(type: string) {
 }
 
 export default function NotificationsPage() {
-  const { notifications, unreadCount, isLoaded, preferences, markAsRead, markAllAsRead, updatePreferences } =
+  const { notifications, unreadCount, isLoaded, error, preferences, markAsRead, markAllAsRead, updatePreferences } =
     useNotifications();
 
   return (
@@ -86,6 +86,10 @@ export default function NotificationsPage() {
         <section>
           {!isLoaded ? (
             <ContentState message="Loading notifications..." loading />
+          ) : error ? (
+            <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {error}
+            </div>
           ) : notifications.length === 0 ? (
             <ContentState message="Nothing new right now. When something meaningful happens, it will show up here softly." />
           ) : (

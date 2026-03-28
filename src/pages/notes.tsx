@@ -255,8 +255,14 @@ export default function Notes() {
     deleteNote,
     toggleFavorite,
     moveNoteToSpace,
-  } = useNotes();
-  const { messages, isLoaded: messagesLoaded, error: messagesError, sendMessage } = useDirectMessages();
+  } = useNotes({
+    activePartnerId: connection?.partner_id ?? null,
+    familyOwnerId: profile?.role === "Mom" ? session?.user.id ?? null : connection?.partner_id ?? null,
+    connectionsCount: connections.length,
+  });
+  const { messages, isLoaded: messagesLoaded, error: messagesError, sendMessage } = useDirectMessages({
+    activePartnerId: connection?.partner_id ?? null,
+  });
 
   const promptFromQuery = useMemo(() => {
     if (typeof window === "undefined") return "";

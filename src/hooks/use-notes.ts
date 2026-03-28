@@ -18,6 +18,12 @@ export interface Note {
   created_at: string;
 }
 
+interface UseNotesOptions {
+  activePartnerId?: string | null;
+  familyOwnerId?: string | null;
+  connectionsCount?: number;
+}
+
 const NOTE_SELECT = "id, user_id, text, author, is_favorite, visibility, partner_id, family_owner_id, created_at";
 
 function getNotesErrorMessage(message: string) {
@@ -36,9 +42,12 @@ function isBetweenUsMatch(note: Note, currentUserId?: string, partnerId?: string
   );
 }
 
-export function useNotes() {
+export function useNotes(options: UseNotesOptions = {}) {
   const { session, profile } = useAuth();
-  const { connection, connections, familyOwnerId } = useConnection();
+  const { connection, connections, familyOwnerId: derivedFamilyOwnerId } = useConnection();
+  const activePartnerId = options.activePartnerId ?? connection?.partner_id ?? null;
+  const familyOwnerId = options.familyOwnerId ?? derivedFamilyOwnerId ?? null;
+  const connectionsCount = options.connectionsCount ?? connections.length;
   const [privateNotes, setPrivateNotes] = useState<Note[]>([]);
   const [betweenUsNotesRaw, setBetweenUsNotesRaw] = useState<Note[]>([]);
   const [familyNotes, setFamilyNotes] = useState<Note[]>([]);
@@ -58,41 +67,71 @@ export function useNotes() {
     setIsLoaded(false);
     setError(null);
 
-    const [{ data: privateData, error: privateError }, { data: betweenUsData, error: betweenUsError }, { data: familyData, error: familyError }] =
-      await Promise.all([
-        supabase
-          .from("notes")
-          .select(NOTE_SELECT)
-          .eq("user_id", session.user.id)
-          .eq("visibility", "private")
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("notes")
-          .select(NOTE_SELECT)
-          .eq("visibility", "between_us")
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("notes")
-          .select(NOTE_SELECT)
-          .eq("visibility", "family")
-          .order("created_at", { ascending: false }),
-      ]);
+    try {
+      const [{ data: privateData, error: privateError }, { data: betweenUsData, error: betweenUsError }, { data: familyData, error: familyError }] =
+        await Promise.all([
+          supabase
+            .from("notes")
+            .select(NOTE_SELECT)
+            .eq("user_id", session.user.id)
+            .eq("visibility", "private")
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("notes")
+            .select(NOTE_SELECT)
+            .eq("visibility", "between_us")
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("notes")
+            .select(NOTE_SELECT)
+            .eq("visibility", "family")
+            .order("created_at", { ascending: false }),
+        ]);
 
-    const nextError = privateError ?? betweenUsError ?? familyError;
-    if (nextError) {
+      const nextError = privateError ?? betweenUsError ?? familyError;
+      if (nextError) {
+        console.error("[notes] load failed", {
+          userId: session.user.id,
+          activePartnerId,
+          familyOwnerId,
+          message: nextError.message,
+        });
+        setPrivateNotes([]);
+        setBetweenUsNotesRaw([]);
+        setFamilyNotes([]);
+        setError(getNotesErrorMessage(nextError.message));
+        setIsLoaded(true);
+        return;
+      }
+
+      console.debug("[notes] load success", {
+        userId: session.user.id,
+        activePartnerId,
+        familyOwnerId,
+        privateCount: privateData?.length ?? 0,
+        betweenUsCount: betweenUsData?.length ?? 0,
+        familyCount: familyData?.length ?? 0,
+      });
+
+      setPrivateNotes((privateData ?? []) as Note[]);
+      setBetweenUsNotesRaw((betweenUsData ?? []) as Note[]);
+      setFamilyNotes((familyData ?? []) as Note[]);
+      setIsLoaded(true);
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : "We couldn't load your notes right now.";
+      console.error("[notes] unexpected load error", {
+        userId: session.user.id,
+        activePartnerId,
+        familyOwnerId,
+        message,
+      });
       setPrivateNotes([]);
       setBetweenUsNotesRaw([]);
       setFamilyNotes([]);
-      setError(getNotesErrorMessage(nextError.message));
+      setError(getNotesErrorMessage(message));
       setIsLoaded(true);
-      return;
     }
-
-    setPrivateNotes((privateData ?? []) as Note[]);
-    setBetweenUsNotesRaw((betweenUsData ?? []) as Note[]);
-    setFamilyNotes((familyData ?? []) as Note[]);
-    setIsLoaded(true);
-  }, [session?.user.id]);
+  }, [activePartnerId, familyOwnerId, session?.user.id]);
 
   useEffect(() => {
     void loadNotes();
@@ -110,27 +149,40 @@ export function useNotes() {
       };
 
       if (space === "between_us") {
-        if (!connection?.partner_id || !familyOwnerId) return false;
-        payload.partner_id = connection.partner_id;
+        if (!activePartnerId || !familyOwnerId) return false;
+        payload.partner_id = activePartnerId;
         payload.family_owner_id = familyOwnerId;
       }
 
       if (space === "family") {
-        if (!familyOwnerId || connections.length === 0) return false;
+        if (!familyOwnerId || connectionsCount === 0) return false;
         payload.family_owner_id = familyOwnerId;
       }
 
       const { error: insertError } = await supabase.from("notes").insert(payload);
 
       if (insertError) {
+        console.error("[notes] insert failed", {
+          userId: session.user.id,
+          activePartnerId,
+          familyOwnerId,
+          space,
+          message: insertError.message,
+        });
         setError(getNotesErrorMessage(insertError.message));
         return false;
       }
 
+      console.debug("[notes] insert success", {
+        userId: session.user.id,
+        activePartnerId,
+        familyOwnerId,
+        space,
+      });
       await loadNotes();
       return true;
     },
-    [connection?.partner_id, connections.length, familyOwnerId, loadNotes, profile?.role, session?.user.id],
+    [activePartnerId, connectionsCount, familyOwnerId, loadNotes, profile?.role, session?.user.id],
   );
 
   const deleteNote = useCallback(
@@ -182,13 +234,13 @@ export function useNotes() {
       };
 
       if (space === "between_us") {
-        if (!connection?.partner_id || !familyOwnerId) return false;
-        updates.partner_id = connection.partner_id;
+        if (!activePartnerId || !familyOwnerId) return false;
+        updates.partner_id = activePartnerId;
         updates.family_owner_id = familyOwnerId;
       }
 
       if (space === "family") {
-        if (!familyOwnerId || connections.length === 0) return false;
+        if (!familyOwnerId || connectionsCount === 0) return false;
         updates.family_owner_id = familyOwnerId;
       }
 
@@ -199,6 +251,13 @@ export function useNotes() {
         .eq("user_id", session.user.id);
 
       if (updateError) {
+        console.error("[notes] move failed", {
+          userId: session.user.id,
+          activePartnerId,
+          familyOwnerId,
+          space,
+          message: updateError.message,
+        });
         setError(getNotesErrorMessage(updateError.message));
         return false;
       }
@@ -206,15 +265,12 @@ export function useNotes() {
       await loadNotes();
       return true;
     },
-    [connection?.partner_id, connections.length, familyOwnerId, loadNotes, session?.user.id],
+    [activePartnerId, connectionsCount, familyOwnerId, loadNotes, session?.user.id],
   );
 
   const betweenUsNotes = useMemo(
-    () =>
-      betweenUsNotesRaw.filter((note) =>
-        isBetweenUsMatch(note, session?.user.id, connection?.partner_id),
-      ),
-    [betweenUsNotesRaw, connection?.partner_id, session?.user.id],
+    () => betweenUsNotesRaw.filter((note) => isBetweenUsMatch(note, session?.user.id, activePartnerId)),
+    [activePartnerId, betweenUsNotesRaw, session?.user.id],
   );
 
   const receivedBetweenUsNotes = useMemo(
@@ -232,15 +288,8 @@ export function useNotes() {
     [familyNotes, session?.user.id],
   );
 
-  const latestReceivedBetweenUsNote = useMemo(
-    () => receivedBetweenUsNotes[0] ?? null,
-    [receivedBetweenUsNotes],
-  );
-
-  const latestReceivedFamilyNote = useMemo(
-    () => receivedFamilyNotes[0] ?? null,
-    [receivedFamilyNotes],
-  );
+  const latestReceivedBetweenUsNote = useMemo(() => receivedBetweenUsNotes[0] ?? null, [receivedBetweenUsNotes]);
+  const latestReceivedFamilyNote = useMemo(() => receivedFamilyNotes[0] ?? null, [receivedFamilyNotes]);
 
   const notes = useMemo(
     () =>

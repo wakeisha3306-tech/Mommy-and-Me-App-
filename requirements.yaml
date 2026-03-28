@@ -1,0 +1,16 @@
+packages:
+  "framer-motion": "For soft, gentle page transitions and interactions that match the nurturing theme"
+  "date-fns": "For beautifully formatting journal entry dates"
+  "lucide-react": "For elegant, clean icons across the app"
+
+images:
+  - path: "artifacts/mommy-and-me/public/images/hero-floral.png"
+    description: "Soft, delicate watercolor floral arrangement in pastel pinks, warm peach, and gentle sage green, very feminine, ethereal, and welcoming"
+    aspect_ratio: "16:9"
+  - path: "artifacts/mommy-and-me/public/images/mom-baby-art.png"
+    description: "Minimalist continuous line art of a mother tenderly holding her baby, soft pastel pink watercolor splash behind the lines, warm, emotional, nurturing"
+    aspect_ratio: "1:1"
+
+notes:
+  - Journal entries are persisted strictly in the browser's localStorage (no backend needed).
+  - The app uses a soft, warm, pastel pink color palette to evoke a cozy, maternal feel.

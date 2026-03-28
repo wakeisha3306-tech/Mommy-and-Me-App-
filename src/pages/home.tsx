@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Sparkles, BookHeart, MessageCircleHeart, ChevronRight, ChevronLeft, HeartHandshake, NotebookPen, MessagesSquare, SunMedium } from "lucide-react";
+import { Sparkles, BookHeart, MessageCircleHeart, ChevronRight, ChevronLeft, HeartHandshake, NotebookPen, MessagesSquare, SunMedium, Heart } from "lucide-react";
 import { format } from "date-fns";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@/context/auth-context";
@@ -153,6 +153,44 @@ export default function Home() {
   const todayLabel = useMemo(() => format(new Date(), "EEEE, MMMM d"), []);
   const allMomentsLoaded = journalLoaded && affirmationsLoaded && notesLoaded;
   const totalMoments = entries.length + affirmations.length + notes.length;
+  const favoriteMoments = useMemo(() => {
+    const favorites = [
+      ...entries
+        .filter((entry) => entry.is_favorite)
+        .map((entry) => ({
+          id: `journal-${entry.id}`,
+          type: "Journal",
+          href: "/journal",
+          text: entry.text,
+          meta: entry.author,
+          created_at: entry.created_at,
+        })),
+      ...affirmations
+        .filter((affirmation) => affirmation.is_favorite)
+        .map((affirmation) => ({
+          id: `affirmation-${affirmation.id}`,
+          type: "Affirmation",
+          href: "/affirmations",
+          text: affirmation.text,
+          meta: affirmation.source === "custom" ? "Custom" : "Saved from deck",
+          created_at: affirmation.created_at,
+        })),
+      ...notes
+        .filter((note) => note.is_favorite)
+        .map((note) => ({
+          id: `note-${note.id}`,
+          type: "Note",
+          href: "/notes",
+          text: note.text,
+          meta: note.author,
+          created_at: note.created_at,
+        })),
+    ];
+
+    return favorites
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 4);
+  }, [affirmations, entries, notes]);
   const latestMoment = useMemo(() => {
     const items = [
       entries[0] ? { label: "Journal", created_at: entries[0].created_at } : null,
@@ -300,6 +338,53 @@ export default function Home() {
               </p>
             )}
           </div>
+        </motion.section>
+
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, delay: 0.2 }}
+          className="app-card p-5"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Favorite Moments</p>
+              <h2 className="mt-2 text-2xl font-serif text-foreground">The ones you want to keep close</h2>
+            </div>
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <Heart className="h-5 w-5 fill-current" />
+            </div>
+          </div>
+
+          {!allMomentsLoaded ? (
+            <div className="mt-4 rounded-[1.35rem] border border-border/70 bg-muted/28 px-4 py-4">
+              <p className="text-sm text-muted-foreground">Gathering your favorite moments...</p>
+            </div>
+          ) : favoriteMoments.length === 0 ? (
+            <div className="mt-4 rounded-[1.35rem] border border-border/70 bg-muted/28 px-4 py-4">
+              <p className="text-sm text-muted-foreground">
+                Tap the little heart on a journal entry, affirmation, or note to keep your most treasured moments here.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 grid gap-3">
+              {favoriteMoments.map((moment) => (
+                <Link key={moment.id} href={moment.href}>
+                  <div className="group cursor-pointer rounded-[1.45rem] border border-border/70 bg-white/84 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+                        <Heart className="h-3.5 w-3.5 fill-current" />
+                        {moment.type}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{formatFriendlyTimestamp(moment.created_at)}</span>
+                    </div>
+                    <p className="mt-3 line-clamp-2 text-sm leading-6 text-foreground">{moment.text}</p>
+                    <p className="mt-3 text-xs uppercase tracking-[0.16em] text-muted-foreground">{moment.meta}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </motion.section>
 
         <motion.div

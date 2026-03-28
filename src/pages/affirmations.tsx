@@ -21,7 +21,7 @@ const AFFIRMATIONS = [
 ];
 
 export default function Affirmations() {
-  const { affirmations, isLoaded, addAffirmation, deleteAffirmation } = useAffirmations();
+  const { affirmations, isLoaded, addAffirmation, deleteAffirmation, toggleFavorite } = useAffirmations();
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(1);
   const [customAffirmation, setCustomAffirmation] = useState("");
@@ -228,14 +228,28 @@ export default function Affirmations() {
                       {affirmation.source === "custom" ? "Custom" : "Saved from deck"}
                     </p>
                   </div>
-                  <button
-                    onClick={() => {
-                      void deleteAffirmation(affirmation.id);
-                    }}
-                    className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        void toggleFavorite(affirmation.id, !affirmation.is_favorite);
+                      }}
+                      className={`rounded-xl p-2 transition-colors ${
+                        affirmation.is_favorite
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:bg-primary/8 hover:text-primary"
+                      }`}
+                    >
+                      <Heart className={`h-4 w-4 ${affirmation.is_favorite ? "fill-current" : ""}`} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        void deleteAffirmation(affirmation.id);
+                      }}
+                      className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

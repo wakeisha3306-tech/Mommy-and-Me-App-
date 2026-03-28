@@ -8,6 +8,7 @@ export interface JournalEntry {
   id: string;
   text: string;
   author: JournalAuthor;
+  is_favorite: boolean;
   created_at: string;
 }
 
@@ -26,7 +27,8 @@ export function useJournal() {
     setIsLoaded(false);
     const { data, error } = await supabase
       .from("journal_entries")
-      .select("id, text, author, created_at")
+      .select("id, text, author, is_favorite, created_at")
+      .eq("user_id", session.user.id)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -78,7 +80,7 @@ export function useJournal() {
 
   const deleteEntry = async (id: string) => {
     if (!supabase || !session?.user.id) return false;
-    const { error } = await supabase.from("journal_entries").delete().eq("id", id);
+    const { error } = await supabase.from("journal_entries").delete().eq("id", id).eq("user_id", session.user.id);
     if (error) {
       console.error(error);
       return false;
@@ -87,5 +89,25 @@ export function useJournal() {
     return true;
   };
 
-  return { entries, isLoaded, addEntry, clearEntries, deleteEntry, reloadEntries: loadEntries };
+  const toggleFavorite = async (id: string, isFavorite: boolean) => {
+    if (!supabase || !session?.user.id) return false;
+
+    const { error } = await supabase
+      .from("journal_entries")
+      .update({ is_favorite: isFavorite })
+      .eq("id", id)
+      .eq("user_id", session.user.id);
+
+    if (error) {
+      console.error(error);
+      return false;
+    }
+
+    setEntries((prev) =>
+      prev.map((entry) => (entry.id === id ? { ...entry, is_favorite: isFavorite } : entry)),
+    );
+    return true;
+  };
+
+  return { entries, isLoaded, addEntry, clearEntries, deleteEntry, toggleFavorite, reloadEntries: loadEntries };
 }

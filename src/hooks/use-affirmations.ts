@@ -7,6 +7,7 @@ export interface SavedAffirmation {
   text: string;
   emoji: string | null;
   source: "preset" | "custom";
+  is_favorite: boolean;
   created_at: string;
 }
 
@@ -25,7 +26,8 @@ export function useAffirmations() {
     setIsLoaded(false);
     const { data, error } = await supabase
       .from("affirmations")
-      .select("id, text, emoji, source, created_at")
+      .select("id, text, emoji, source, is_favorite, created_at")
+      .eq("user_id", session.user.id)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -69,7 +71,7 @@ export function useAffirmations() {
     async (id: string) => {
       if (!supabase || !session?.user.id) return false;
 
-      const { error } = await supabase.from("affirmations").delete().eq("id", id);
+      const { error } = await supabase.from("affirmations").delete().eq("id", id).eq("user_id", session.user.id);
 
       if (error) {
         console.error(error);
@@ -82,5 +84,30 @@ export function useAffirmations() {
     [session?.user.id],
   );
 
-  return { affirmations, isLoaded, addAffirmation, deleteAffirmation, reloadAffirmations: loadAffirmations };
+  const toggleFavorite = useCallback(
+    async (id: string, isFavorite: boolean) => {
+      if (!supabase || !session?.user.id) return false;
+
+      const { error } = await supabase
+        .from("affirmations")
+        .update({ is_favorite: isFavorite })
+        .eq("id", id)
+        .eq("user_id", session.user.id);
+
+      if (error) {
+        console.error(error);
+        return false;
+      }
+
+      setAffirmations((current) =>
+        current.map((affirmation) =>
+          affirmation.id === id ? { ...affirmation, is_favorite: isFavorite } : affirmation,
+        ),
+      );
+      return true;
+    },
+    [session?.user.id],
+  );
+
+  return { affirmations, isLoaded, addAffirmation, deleteAffirmation, toggleFavorite, reloadAffirmations: loadAffirmations };
 }

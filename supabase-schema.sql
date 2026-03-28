@@ -5,6 +5,7 @@ create table if not exists public.journal_entries (
   user_id uuid not null references auth.users(id) on delete cascade,
   author text not null check (author in ('Mom', 'Daughter')),
   text text not null,
+  is_favorite boolean not null default false,
   created_at timestamptz not null default timezone('utc', now())
 );
 
@@ -14,6 +15,7 @@ create table if not exists public.affirmations (
   text text not null,
   emoji text,
   source text not null default 'custom' check (source in ('preset', 'custom')),
+  is_favorite boolean not null default false,
   created_at timestamptz not null default timezone('utc', now())
 );
 
@@ -22,8 +24,13 @@ create table if not exists public.notes (
   user_id uuid not null references auth.users(id) on delete cascade,
   author text not null check (author in ('Mom', 'Daughter')),
   text text not null,
+  is_favorite boolean not null default false,
   created_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.journal_entries add column if not exists is_favorite boolean not null default false;
+alter table public.affirmations add column if not exists is_favorite boolean not null default false;
+alter table public.notes add column if not exists is_favorite boolean not null default false;
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -70,6 +77,12 @@ create policy "Users can delete their own journal entries"
 on public.journal_entries for delete
 using (auth.uid() = user_id);
 
+drop policy if exists "Users can update their own journal entries" on public.journal_entries;
+create policy "Users can update their own journal entries"
+on public.journal_entries for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
 drop policy if exists "Users can read their own affirmations" on public.affirmations;
 create policy "Users can read their own affirmations"
 on public.affirmations for select
@@ -85,6 +98,12 @@ create policy "Users can delete their own affirmations"
 on public.affirmations for delete
 using (auth.uid() = user_id);
 
+drop policy if exists "Users can update their own affirmations" on public.affirmations;
+create policy "Users can update their own affirmations"
+on public.affirmations for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
 drop policy if exists "Users can read their own notes" on public.notes;
 create policy "Users can read their own notes"
 on public.notes for select
@@ -99,6 +118,12 @@ drop policy if exists "Users can delete their own notes" on public.notes;
 create policy "Users can delete their own notes"
 on public.notes for delete
 using (auth.uid() = user_id);
+
+drop policy if exists "Users can update their own notes" on public.notes;
+create policy "Users can update their own notes"
+on public.notes for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
 
 drop policy if exists "Users can read their own profile" on public.profiles;
 create policy "Users can read their own profile"

@@ -30,7 +30,7 @@ const MOODS = [
 ];
 
 export default function Journal() {
-  const { entries, addEntry, deleteEntry, isLoaded } = useJournal();
+  const { entries, addEntry, deleteEntry, toggleFavorite, isLoaded } = useJournal();
   const [newEntry, setNewEntry] = useState("");
   const [author, setAuthor] = useState<Author>("Mom");
   const [mood, setMood] = useState<string | null>(null);
@@ -169,14 +169,28 @@ export default function Journal() {
                             {formatFriendlyTimestamp(entry.created_at)}
                           </span>
                         </div>
-                        <button
-                          onClick={() => {
-                            void deleteEntry(entry.id);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 text-muted-foreground hover:text-destructive rounded-xl hover:bg-destructive/10 transition-all duration-200"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              void toggleFavorite(entry.id, !entry.is_favorite);
+                            }}
+                            className={`rounded-xl p-2 transition-all duration-200 ${
+                              entry.is_favorite
+                                ? "bg-primary/10 text-primary"
+                                : "text-muted-foreground hover:bg-primary/8 hover:text-primary"
+                            }`}
+                          >
+                            <Heart className={`w-4 h-4 ${entry.is_favorite ? "fill-current" : ""}`} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              void deleteEntry(entry.id);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 text-muted-foreground hover:text-destructive rounded-xl hover:bg-destructive/10 transition-all duration-200"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                       <p className="text-foreground leading-relaxed text-sm whitespace-pre-wrap">{entry.text}</p>
                     </motion.div>

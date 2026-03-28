@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Trash2, MessageCircleHeart, Flower } from "lucide-react";
+import { Send, Trash2, MessageCircleHeart, Flower, Heart } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { ContentState } from "@/components/content-state";
 import { useNotes, type NoteAuthor } from "@/hooks/use-notes";
@@ -35,7 +35,7 @@ const QUICK_NOTES = [
 ];
 
 export default function Notes() {
-  const { notes, isLoaded, error, addNote, deleteNote } = useNotes();
+  const { notes, isLoaded, error, addNote, deleteNote, toggleFavorite } = useNotes();
   const [text, setText] = useState("");
   const [author, setAuthor] = useState<NoteAuthor>("Mom");
 
@@ -167,14 +167,26 @@ export default function Notes() {
                           }`}
                         >
                           <p className="text-foreground text-sm leading-relaxed">{note.text}</p>
-                          <button
-                            onClick={() => {
-                              void deleteNote(note.id);
-                            }}
-                            className="absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-full bg-white border border-border shadow-sm opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all duration-200"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
+                          <div className="absolute -top-2 -right-2 flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                void toggleFavorite(note.id, !note.is_favorite);
+                              }}
+                              className={`flex h-7 w-7 items-center justify-center rounded-full border border-border bg-white shadow-sm transition-all duration-200 ${
+                                note.is_favorite ? "text-primary" : "text-muted-foreground hover:text-primary"
+                              }`}
+                            >
+                              <Heart className={`w-3.5 h-3.5 ${note.is_favorite ? "fill-current" : ""}`} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                void deleteNote(note.id);
+                              }}
+                              className="w-6 h-6 flex items-center justify-center rounded-full bg-white border border-border shadow-sm opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all duration-200"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
                         <div className={`flex items-center gap-1.5 mt-1.5 ${isMom ? "justify-start" : "justify-end"}`}>
                           <span className="text-xs text-muted-foreground/70">

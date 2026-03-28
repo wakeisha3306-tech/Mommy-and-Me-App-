@@ -12,6 +12,17 @@ const hasValidSupabaseKey = Boolean(
 
 export const isSupabaseConfigured = hasValidSupabaseUrl && hasValidSupabaseKey;
 
+export function getAuthRedirectUrl(path = "/") {
+  if (typeof window === "undefined") {
+    return path;
+  }
+
+  const base = new URL(import.meta.env.BASE_URL || "/", window.location.origin);
+  const normalizedPath = path.replace(/^\/+/, "");
+
+  return new URL(normalizedPath, base).toString();
+}
+
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {

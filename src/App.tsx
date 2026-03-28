@@ -12,36 +12,46 @@ import Notes from "@/pages/notes";
 import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth";
+import OnboardingPage from "@/pages/onboarding";
 
 const queryClient = new QueryClient();
 
 function Router() {
-  const { session, loading } = useAuth();
+  const { session, loading, needsOnboarding, profileLoading } = useAuth();
   const [location, navigate] = useLocation();
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || (session && profileLoading)) return;
 
     if (!session && location !== "/auth") {
       navigate("/auth");
     }
 
-    if (session && location === "/auth") {
+    if (session && needsOnboarding && location !== "/onboarding") {
+      navigate("/onboarding");
+    }
+
+    if (session && !needsOnboarding && (location === "/auth" || location === "/onboarding")) {
       navigate("/");
     }
-  }, [loading, location, navigate, session]);
+  }, [loading, location, navigate, needsOnboarding, profileLoading, session]);
 
-  if (loading) {
-    return <LoadingScreen />;
+  if (loading || (session && profileLoading)) {
+    return <LoadingScreen message={session ? "Loading your profile..." : "Loading your space..."} />;
   }
 
   if (!session) {
     return <AuthPage />;
   }
 
+  if (needsOnboarding) {
+    return <OnboardingPage />;
+  }
+
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
+      <Route path="/onboarding" component={OnboardingPage} />
       <Route path="/" component={Home} />
       <Route path="/affirmations" component={Affirmations} />
       <Route path="/journal" component={Journal} />

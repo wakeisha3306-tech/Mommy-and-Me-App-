@@ -38,20 +38,28 @@ export default function AuthPage() {
       return;
     }
 
-    const result =
-      mode === "signup"
-        ? await signUp(email.trim(), password)
-        : await signIn(email.trim(), password);
+    if (mode === "signup") {
+      const result = await signUp(email.trim(), password);
+      setSubmitting(false);
 
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+
+      setMessage(
+        result.requiresEmailConfirmation
+          ? "Check your email to confirm your account before logging in."
+          : "Your account is ready. Let's finish setting up your space.",
+      );
+      return;
+    }
+
+    const result = await signIn(email.trim(), password);
     setSubmitting(false);
 
     if (result.error) {
       setError(result.error);
-      return;
-    }
-
-    if (mode === "signup") {
-      setMessage("Account created. If your Supabase project requires email confirmation, check your inbox before logging in.");
       return;
     }
 

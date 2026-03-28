@@ -19,3 +19,20 @@ export function formatFriendlyTimestamp(value: string) {
 
   return format(date, "MMM d, yyyy 'at' h:mm a")
 }
+
+export function deriveDisplayName(email?: string | null) {
+  if (!email) return "beautiful soul"
+
+  const localPart = email.split("@")[0]?.trim()
+  if (!localPart) return email
+
+  return localPart
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
+}
+
+export function getUserLabel(displayName?: string | null, email?: string | null) {
+  return displayName?.trim() || deriveDisplayName(email)
+}

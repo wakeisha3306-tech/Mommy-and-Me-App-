@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Home, Sparkles, BookHeart, MessageCircleHeart, LogOut, Settings } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/auth-context";
+import { getUserLabel } from "@/lib/utils";
 
 interface LayoutProps {
   children: ReactNode;
@@ -20,7 +21,8 @@ const NAV_ITEMS = [
 
 export function Layout({ children, title, subtitle }: LayoutProps) {
   const [location] = useLocation();
-  const { session, signOut } = useAuth();
+  const { session, profile, signOut } = useAuth();
+  const userLabel = getUserLabel(profile?.display_name, session?.user.email);
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center bg-background relative overflow-hidden">
@@ -31,7 +33,8 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
         <div className="flex items-center justify-between rounded-2xl border border-border bg-white/80 px-4 py-3 shadow-sm backdrop-blur-sm">
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Signed in as</p>
-            <p className="truncate text-sm font-medium text-foreground">{session?.user.email}</p>
+            <p className="truncate text-sm font-medium text-foreground">{userLabel}</p>
+            <p className="truncate text-xs text-muted-foreground">{session?.user.email}</p>
           </div>
           <button
             type="button"

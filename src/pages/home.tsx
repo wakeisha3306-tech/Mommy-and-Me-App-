@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Sparkles, BookHeart, MessageCircleHeart, ChevronRight, ChevronLeft } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@/context/auth-context";
+import { getUserLabel } from "@/lib/utils";
 
 const DAILY_AFFIRMATIONS = [
   "I am strong and capable 💪🏽",
@@ -26,19 +27,6 @@ function getGreeting() {
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
-}
-
-function getDisplayName(email?: string | null) {
-  if (!email) return "beautiful soul";
-
-  const localPart = email.split("@")[0]?.trim();
-  if (!localPart) return email;
-
-  return localPart
-    .split(/[._-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }
 
 const QUOTES = [
@@ -112,10 +100,13 @@ const QUICK_LINKS = [
 ];
 
 export default function Home() {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const affirmation = useMemo(getDailyAffirmation, []);
   const greeting = useMemo(getGreeting, []);
-  const displayName = useMemo(() => getDisplayName(session?.user.email), [session?.user.email]);
+  const displayName = useMemo(
+    () => getUserLabel(profile?.display_name, session?.user.email),
+    [profile?.display_name, session?.user.email],
+  );
   const [quoteIndex, setQuoteIndex] = useState(0);
   const prevQuote = () => setQuoteIndex((i) => (i - 1 + QUOTES.length) % QUOTES.length);
   const nextQuote = () => setQuoteIndex((i) => (i + 1) % QUOTES.length);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Flower,
@@ -28,6 +28,13 @@ import { formatFriendlyTimestamp, getUserLabel } from "@/lib/utils";
 
 type NotesTab = "private" | "between_us" | "family" | "direct";
 
+const TAB_PLACEHOLDERS: Record<NotesTab, string> = {
+  private: "A thought I want to keep to myself for now...",
+  between_us: "Something I want us to hold together...",
+  family: "Something I want the whole family space to hear...",
+  direct: "A soft message just for you...",
+};
+
 const TAB_CONFIG: Record<NotesTab, { label: string; description: string; icon: typeof Lock }> = {
   private: {
     label: "My Space",
@@ -50,30 +57,6 @@ const TAB_CONFIG: Record<NotesTab, { label: string; description: string; icon: t
     icon: MessageCircleHeart,
   },
 };
-
-const PRIVATE_PROMPTS = [
-  "A thought I want to keep to myself for now...",
-  "Something I want to remember from today...",
-  "A quiet feeling I want to hold onto...",
-];
-
-const BETWEEN_US_PROMPTS = [
-  "Something I want us to hold together...",
-  "A note meant just for one of us...",
-  "A little truth for this relationship...",
-];
-
-const FAMILY_PROMPTS = [
-  "Something I want the whole family space to hear...",
-  "A family note I want us all to carry...",
-  "A loving reminder for all of us...",
-];
-
-const DIRECT_PROMPTS = [
-  "A soft message just for you...",
-  "Something I want to tell you directly...",
-  "A little note from my heart to yours...",
-];
 
 const OWN_BADGE = {
   Mom: "bg-primary/15 text-primary",
@@ -326,19 +309,8 @@ export default function Notes() {
   );
   const canUseBetweenUs = Boolean(connection?.partner_id);
   const canUseFamilySpace = connections.length > 0;
-  const directFeed = useMemo(
-    () => [...messages].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
-    [messages],
-  );
-
-  const currentPlaceholder =
-    activeTab === "private"
-      ? PRIVATE_PROMPTS[0]
-      : activeTab === "between_us"
-        ? BETWEEN_US_PROMPTS[0]
-        : activeTab === "family"
-          ? FAMILY_PROMPTS[0]
-          : DIRECT_PROMPTS[0];
+  const directFeed = messages;
+  const currentPlaceholder = TAB_PLACEHOLDERS[activeTab];
 
   const handleCreate = async () => {
     if (!draft.trim()) return;
@@ -690,3 +662,4 @@ export default function Notes() {
     </Layout>
   );
 }
+

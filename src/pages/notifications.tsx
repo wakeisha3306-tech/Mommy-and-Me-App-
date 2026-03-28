@@ -7,6 +7,15 @@ import { useNotifications } from "@/hooks/use-notifications";
 import { getGentleAlertsEnabled, setGentleAlertsEnabled } from "@/lib/notifications";
 import { formatFriendlyTimestamp } from "@/lib/utils";
 
+const NOTIFICATION_SETTINGS_OPTIONS = [
+  ["connection_updates", "Connection updates"],
+  ["shared_notes", "Shared notes"],
+  ["direct_messages", "Direct messages"],
+  ["family_messages", "Family Space notes"],
+  ["mood_alerts", "Mood alerts"],
+  ["gentle_alerts", "Gentle bell pulse"],
+] as const;
+
 function getNotificationIcon(type: string) {
   switch (type) {
     case "connection_joined":
@@ -76,14 +85,7 @@ export default function NotificationsPage() {
         <section className="app-card-soft p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Notification settings</p>
           <div className="mt-4 grid gap-3">
-            {[
-              ["connection_updates", "Connection updates"],
-              ["shared_notes", "Shared notes"],
-              ["direct_messages", "Direct messages"],
-              ["family_messages", "Family Space notes"],
-              ["mood_alerts", "Mood alerts"],
-              ["gentle_alerts", "Gentle bell pulse"],
-            ].map(([key, label]) => (
+            {NOTIFICATION_SETTINGS_OPTIONS.map(([key, label]) => (
               <label key={key} className="flex items-center justify-between gap-3 rounded-[1.1rem] border border-border/70 bg-white/85 px-4 py-3">
                 <span className="text-sm font-medium text-foreground">{label}</span>
                 {key === "gentle_alerts" ? (

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 import {
@@ -124,10 +124,6 @@ export function useNotifications() {
         moodResult.error;
 
       if (nextError) {
-        console.error("[notifications] load failed", {
-          userId,
-          message: nextError.message,
-        });
         setNotifications([]);
         setPreferences(getDefaultNotificationPreferences(userId));
         setError(nextError.message);
@@ -160,12 +156,7 @@ export function useNotifications() {
           .select("id, display_name, email")
           .in("id", partnerIds);
 
-        if (profileError) {
-          console.error("[notifications] partner profile lookup failed", {
-            userId,
-            message: profileError.message,
-          });
-        } else {
+        if (!profileError) {
           profileLookup = new Map((profileRows ?? []).map((item) => [item.id, item as ProfileRow]));
         }
       }
@@ -199,7 +190,6 @@ export function useNotifications() {
           };
         }),
         ...familyNotes.map((note) => {
-          const sender = profileLookup.get(note.user_id);
           const read = readLookup.get(`family_note:${note.id}`);
           return {
             id: `family_note:${note.id}`,
@@ -227,13 +217,14 @@ export function useNotifications() {
         }),
         ...moodAlerts.map((alert) => {
           const sender = profileLookup.get(alert.sender_id);
+          const senderLabel = getUserLabel(sender?.display_name, sender?.email);
           const read = readLookup.get(`mood_alert:${alert.id}`);
           return {
             id: `mood_alert:${alert.id}`,
             source_id: alert.id,
             type: "mood_alert" as const,
-            title: `${sender ? getUserLabel(sender.display_name, sender.email) : "Someone"} might need you today 💛`,
-            body: `${getUserLabel(sender?.display_name, sender?.email)} shared how she's feeling today.`,
+            title: `${senderLabel} might need you today 💛`,
+            body: `${senderLabel} shared how she's feeling today.`,
             href: `/notes?tab=direct&partner=${encodeURIComponent(alert.sender_id)}`,
             read_at: alert.viewed_at ?? read?.read_at ?? null,
             created_at: alert.created_at,
@@ -251,25 +242,11 @@ export function useNotifications() {
         return true;
       });
 
-      console.debug("[notifications] load success", {
-        userId,
-        connections: connections.length,
-        betweenUs: betweenUsNotes.length,
-        family: familyNotes.length,
-        directMessages: directMessages.length,
-        moodAlerts: moodAlerts.length,
-        unread: filteredNotifications.filter((item) => !item.read_at).length,
-      });
-
       setNotifications(filteredNotifications);
       setPreferences(nextPreferences);
       setIsLoaded(true);
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : "We couldn't load notifications right now.";
-      console.error("[notifications] unexpected load error", {
-        userId,
-        message,
-      });
       setNotifications([]);
       setPreferences(getDefaultNotificationPreferences(userId));
       setError(message);
@@ -386,3 +363,4 @@ export function useNotifications() {
     reloadNotifications: loadNotifications,
   };
 }
+

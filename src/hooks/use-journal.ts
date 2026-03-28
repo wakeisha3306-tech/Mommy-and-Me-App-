@@ -32,7 +32,6 @@ export function useJournal() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error(error);
       setEntries([]);
       setIsLoaded(true);
       return;
@@ -58,7 +57,6 @@ export function useJournal() {
       })
       .then(async ({ error }) => {
         if (error) {
-          console.error(error);
           return false;
         }
 
@@ -71,7 +69,6 @@ export function useJournal() {
     if (!supabase || !session?.user.id) return false;
     const { error } = await supabase.from("journal_entries").delete().eq("user_id", session.user.id);
     if (error) {
-      console.error(error);
       return false;
     }
     setEntries([]);
@@ -82,7 +79,6 @@ export function useJournal() {
     if (!supabase || !session?.user.id) return false;
     const { error } = await supabase.from("journal_entries").delete().eq("id", id).eq("user_id", session.user.id);
     if (error) {
-      console.error(error);
       return false;
     }
     setEntries((prev) => prev.filter((entry) => entry.id !== id));
@@ -99,7 +95,6 @@ export function useJournal() {
       .eq("user_id", session.user.id);
 
     if (error) {
-      console.error(error);
       return false;
     }
 

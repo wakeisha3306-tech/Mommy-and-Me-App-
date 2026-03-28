@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { startOfDay, endOfDay } from "date-fns";
+import { endOfDay, startOfDay } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 
@@ -88,11 +88,6 @@ export function useMoodCheckin() {
       return;
     }
 
-    console.debug("[mood] load success", {
-      userId: session.user.id,
-      checkinCount: checkinRows?.length ?? 0,
-      alertCount: alertData?.length ?? 0,
-    });
     setTodayCheckin((checkinRows?.[0] as MoodCheckin | undefined) ?? null);
     setAlerts((alertData ?? []) as MoodSupportAlert[]);
     setIsLoaded(true);
@@ -126,10 +121,6 @@ export function useMoodCheckin() {
       if (existingError) {
         setIsSaving(false);
         setError(existingError.message);
-        console.error("[mood] existing row lookup failed", {
-          userId: session.user.id,
-          message: existingError.message,
-        });
         return { error: existingError.message };
       }
 
@@ -166,19 +157,13 @@ export function useMoodCheckin() {
 
         if (insertError) {
           if (/mood_checkins_user_day_idx/i.test(insertError.message) || /duplicate key value/i.test(insertError.message)) {
-            console.warn("[mood] duplicate day check-in prevented, retrying as update", {
-              userId: session.user.id,
-            });
             await loadMoodState();
             setIsSaving(false);
             return saveCheckin(mood, shared, recipientId);
           }
+
           setIsSaving(false);
           setError(insertError.message);
-          console.error("[mood] insert failed", {
-            userId: session.user.id,
-            message: insertError.message,
-          });
           return { error: insertError.message };
         }
 
@@ -201,11 +186,6 @@ export function useMoodCheckin() {
           if (alertError) {
             setIsSaving(false);
             setError(alertError.message);
-            console.error("[mood] alert upsert failed", {
-              userId: session.user.id,
-              recipientId,
-              message: alertError.message,
-            });
             return { error: alertError.message };
           }
         } else {
@@ -213,13 +193,6 @@ export function useMoodCheckin() {
         }
       }
 
-      console.debug("[mood] save success", {
-        userId: session.user.id,
-        mood,
-        shared,
-        recipientId: recipientId ?? null,
-        checkinId,
-      });
       setIsSaving(false);
       return { error: null };
     },

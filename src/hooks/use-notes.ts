@@ -90,12 +90,6 @@ export function useNotes(options: UseNotesOptions = {}) {
 
       const nextError = privateError ?? betweenUsError ?? familyError;
       if (nextError) {
-        console.error("[notes] load failed", {
-          userId: session.user.id,
-          activePartnerId,
-          familyOwnerId,
-          message: nextError.message,
-        });
         setPrivateNotes([]);
         setBetweenUsNotesRaw([]);
         setFamilyNotes([]);
@@ -104,27 +98,12 @@ export function useNotes(options: UseNotesOptions = {}) {
         return;
       }
 
-      console.debug("[notes] load success", {
-        userId: session.user.id,
-        activePartnerId,
-        familyOwnerId,
-        privateCount: privateData?.length ?? 0,
-        betweenUsCount: betweenUsData?.length ?? 0,
-        familyCount: familyData?.length ?? 0,
-      });
-
       setPrivateNotes((privateData ?? []) as Note[]);
       setBetweenUsNotesRaw((betweenUsData ?? []) as Note[]);
       setFamilyNotes((familyData ?? []) as Note[]);
       setIsLoaded(true);
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : "We couldn't load your notes right now.";
-      console.error("[notes] unexpected load error", {
-        userId: session.user.id,
-        activePartnerId,
-        familyOwnerId,
-        message,
-      });
       setPrivateNotes([]);
       setBetweenUsNotesRaw([]);
       setFamilyNotes([]);
@@ -162,23 +141,9 @@ export function useNotes(options: UseNotesOptions = {}) {
       const { error: insertError } = await supabase.from("notes").insert(payload);
 
       if (insertError) {
-        console.error("[notes] insert failed", {
-          userId: session.user.id,
-          activePartnerId,
-          familyOwnerId,
-          space,
-          message: insertError.message,
-        });
         setError(getNotesErrorMessage(insertError.message));
         return false;
       }
-
-      console.debug("[notes] insert success", {
-        userId: session.user.id,
-        activePartnerId,
-        familyOwnerId,
-        space,
-      });
       await loadNotes();
       return true;
     },
@@ -251,13 +216,6 @@ export function useNotes(options: UseNotesOptions = {}) {
         .eq("user_id", session.user.id);
 
       if (updateError) {
-        console.error("[notes] move failed", {
-          userId: session.user.id,
-          activePartnerId,
-          familyOwnerId,
-          space,
-          message: updateError.message,
-        });
         setError(getNotesErrorMessage(updateError.message));
         return false;
       }

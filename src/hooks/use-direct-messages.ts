@@ -46,36 +46,21 @@ export function useDirectMessages(options: UseDirectMessagesOptions = {}) {
         .order("created_at", { ascending: false });
 
       if (loadError) {
-        console.error("[direct-messages] load failed", {
-          userId: session.user.id,
-          activePartnerId,
-          message: loadError.message,
-        });
         setAllMessages([]);
         setError(loadError.message);
         setIsLoaded(true);
         return;
       }
 
-      console.debug("[direct-messages] load success", {
-        userId: session.user.id,
-        activePartnerId,
-        count: data?.length ?? 0,
-      });
       setAllMessages((data ?? []) as DirectMessage[]);
       setIsLoaded(true);
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : "We couldn't load your messages right now.";
-      console.error("[direct-messages] unexpected load error", {
-        userId: session.user.id,
-        activePartnerId,
-        message,
-      });
       setAllMessages([]);
       setError(message);
       setIsLoaded(true);
     }
-  }, [activePartnerId, session?.user.id]);
+  }, [session?.user.id]);
 
   useEffect(() => {
     void loadMessages();
@@ -104,19 +89,10 @@ export function useDirectMessages(options: UseDirectMessagesOptions = {}) {
       });
 
       if (insertError) {
-        console.error("[direct-messages] send failed", {
-          userId: session.user.id,
-          activePartnerId,
-          message: insertError.message,
-        });
         setError(insertError.message);
         return false;
       }
 
-      console.debug("[direct-messages] send success", {
-        userId: session.user.id,
-        activePartnerId,
-      });
       await loadMessages();
       return true;
     },

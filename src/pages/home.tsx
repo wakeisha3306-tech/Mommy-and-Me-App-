@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Bell, BookHeart, MessageCircleHeart, Sparkles, Star, Users } from "lucide-react";
 import { Layout } from "@/components/layout";
@@ -292,7 +292,7 @@ export default function Home() {
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary/75">Welcome</p>
             <h2 className="mt-3 text-3xl font-serif leading-tight text-foreground">This is your space.</h2>
             <p className="mt-3 text-sm leading-7 text-foreground/88">
-              A place to be heard, supported, and close — no matter what.
+              A place to be heard, supported, and close - no matter what.
             </p>
             <button type="button" onClick={dismissWelcome} className="app-button-primary mt-5">
               Enter Between Us
@@ -502,3 +502,4 @@ export default function Home() {
     </Layout>
   );
 }
+

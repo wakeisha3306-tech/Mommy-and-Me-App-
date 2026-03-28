@@ -95,13 +95,7 @@ export function useConnection() {
         .select("id, display_name, email")
         .in("id", partnerIds);
 
-      if (profileError) {
-        console.warn("[connection] partner profile lookup blocked or failed", {
-          userId: session.user.id,
-          partnerIds,
-          message: profileError.message,
-        });
-      } else {
+      if (!profileError) {
         partnerLookup = new Map((partnerProfiles ?? []).map((partner) => [partner.id, partner as PartnerProfileRow]));
       }
     }
@@ -115,11 +109,6 @@ export function useConnection() {
     setConnections(nextConnections);
     setActiveInvites((inviteRows ?? []) as ConnectionInvite[]);
     setIsLoaded(true);
-    console.debug("[connection] state loaded", {
-      userId: session.user.id,
-      connectionCount: nextConnections.length,
-      selectedPartnerId,
-    });
     return {
       connections: nextConnections,
       activeInvites: (inviteRows ?? []) as ConnectionInvite[],
@@ -234,7 +223,7 @@ export function useConnection() {
             : `You're connected with ${partnerLabel}. Your one-to-one space is ready now.`,
       };
     },
-    [loadConnectionState, profile?.display_name, profile?.role, session?.user.email, session?.user.id],
+    [loadConnectionState, profile?.role, session?.user.id],
   );
 
   const inviteLinks = useMemo(
@@ -268,7 +257,9 @@ export function useConnection() {
     inviteLinks,
     isLoaded,
     error,
-    canCreateInvite: !(profile?.age_range === "Under 13" && profile.role === "Daughter") && !(profile?.role === "Daughter" && connections.length > 0),
+    canCreateInvite:
+      !(profile?.age_range === "Under 13" && profile.role === "Daughter") &&
+      !(profile?.role === "Daughter" && connections.length > 0),
     inviteRestrictionMessage:
       profile?.role === "Daughter" && connections.length > 0
         ? "This Daughter account is already linked to Mom. If you ever expand later, we can open this up more carefully."

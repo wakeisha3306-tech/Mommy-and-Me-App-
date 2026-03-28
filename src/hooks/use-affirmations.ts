@@ -31,7 +31,6 @@ export function useAffirmations() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error(error);
       setAffirmations([]);
       setIsLoaded(true);
       return;
@@ -57,7 +56,6 @@ export function useAffirmations() {
       });
 
       if (error) {
-        console.error(error);
         return false;
       }
 
@@ -74,7 +72,6 @@ export function useAffirmations() {
       const { error } = await supabase.from("affirmations").delete().eq("id", id).eq("user_id", session.user.id);
 
       if (error) {
-        console.error(error);
         return false;
       }
 
@@ -95,7 +92,6 @@ export function useAffirmations() {
         .eq("user_id", session.user.id);
 
       if (error) {
-        console.error(error);
         return false;
       }
 

@@ -32,7 +32,6 @@ export function useRealMoments() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error(error);
       setMoments([]);
       setError(
         error.code === "PGRST205"
@@ -61,7 +60,6 @@ export function useRealMoments() {
       });
 
       if (error) {
-        console.error(error);
         setError(
           error.code === "PGRST205"
             ? "The real moments table is not set up in Supabase yet. Run the newest SQL to enable it."
@@ -83,7 +81,6 @@ export function useRealMoments() {
       const { error } = await supabase.from("real_moments").delete().eq("id", id).eq("user_id", session.user.id);
 
       if (error) {
-        console.error(error);
         setError(error.message);
         return false;
       }

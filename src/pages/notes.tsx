@@ -327,7 +327,7 @@ export default function Notes() {
   const canUseBetweenUs = Boolean(connection?.partner_id);
   const canUseFamilySpace = connections.length > 0;
   const directFeed = useMemo(
-    () => [...messages].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+    () => [...messages].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
     [messages],
   );
 

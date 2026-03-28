@@ -62,7 +62,7 @@ export function useMoodCheckin() {
     const dayStart = startOfDay(new Date()).toISOString();
     const dayEnd = endOfDay(new Date()).toISOString();
 
-    const [{ data: checkinData, error: checkinError }, { data: alertData, error: alertError }] = await Promise.all([
+    const [{ data: checkinRows, error: checkinError }, { data: alertData, error: alertError }] = await Promise.all([
       supabase
         .from("mood_checkins")
         .select(CHECKIN_SELECT)
@@ -70,8 +70,7 @@ export function useMoodCheckin() {
         .gte("created_at", dayStart)
         .lte("created_at", dayEnd)
         .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle<MoodCheckin>(),
+        .limit(1),
       supabase
         .from("mood_support_alerts")
         .select(ALERT_SELECT)
@@ -89,7 +88,12 @@ export function useMoodCheckin() {
       return;
     }
 
-    setTodayCheckin(checkinData ?? null);
+    console.debug("[mood] load success", {
+      userId: session.user.id,
+      checkinCount: checkinRows?.length ?? 0,
+      alertCount: alertData?.length ?? 0,
+    });
+    setTodayCheckin((checkinRows?.[0] as MoodCheckin | undefined) ?? null);
     setAlerts((alertData ?? []) as MoodSupportAlert[]);
     setIsLoaded(true);
   }, [session?.user.id]);
@@ -107,13 +111,36 @@ export function useMoodCheckin() {
       setIsSaving(true);
       setError(null);
 
-      let checkinId = todayCheckin?.id ?? null;
+      const dayStart = startOfDay(new Date()).toISOString();
+      const dayEnd = endOfDay(new Date()).toISOString();
 
-      if (todayCheckin?.id) {
+      const { data: existingRows, error: existingError } = await supabase
+        .from("mood_checkins")
+        .select(CHECKIN_SELECT)
+        .eq("user_id", session.user.id)
+        .gte("created_at", dayStart)
+        .lte("created_at", dayEnd)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (existingError) {
+        setIsSaving(false);
+        setError(existingError.message);
+        console.error("[mood] existing row lookup failed", {
+          userId: session.user.id,
+          message: existingError.message,
+        });
+        return { error: existingError.message };
+      }
+
+      const existingCheckin = (existingRows?.[0] as MoodCheckin | undefined) ?? todayCheckin ?? null;
+      let checkinId = existingCheckin?.id ?? null;
+
+      if (existingCheckin?.id) {
         const { data, error: updateError } = await supabase
           .from("mood_checkins")
           .update({ mood, shared })
-          .eq("id", todayCheckin.id)
+          .eq("id", existingCheckin.id)
           .eq("user_id", session.user.id)
           .select(CHECKIN_SELECT)
           .single<MoodCheckin>();
@@ -138,8 +165,20 @@ export function useMoodCheckin() {
           .single<MoodCheckin>();
 
         if (insertError) {
+          if (/mood_checkins_user_day_idx/i.test(insertError.message) || /duplicate key value/i.test(insertError.message)) {
+            console.warn("[mood] duplicate day check-in prevented, retrying as update", {
+              userId: session.user.id,
+            });
+            await loadMoodState();
+            setIsSaving(false);
+            return saveCheckin(mood, shared, recipientId);
+          }
           setIsSaving(false);
           setError(insertError.message);
+          console.error("[mood] insert failed", {
+            userId: session.user.id,
+            message: insertError.message,
+          });
           return { error: insertError.message };
         }
 
@@ -162,6 +201,11 @@ export function useMoodCheckin() {
           if (alertError) {
             setIsSaving(false);
             setError(alertError.message);
+            console.error("[mood] alert upsert failed", {
+              userId: session.user.id,
+              recipientId,
+              message: alertError.message,
+            });
             return { error: alertError.message };
           }
         } else {
@@ -169,10 +213,17 @@ export function useMoodCheckin() {
         }
       }
 
+      console.debug("[mood] save success", {
+        userId: session.user.id,
+        mood,
+        shared,
+        recipientId: recipientId ?? null,
+        checkinId,
+      });
       setIsSaving(false);
       return { error: null };
     },
-    [profile?.role, session?.user.id],
+    [loadMoodState, profile?.role, session?.user.id, todayCheckin],
   );
 
   const markAlertViewed = useCallback(

@@ -96,7 +96,11 @@ export function useConnection() {
         .in("id", partnerIds);
 
       if (profileError) {
-        setError(profileError.message);
+        console.warn("[connection] partner profile lookup blocked or failed", {
+          userId: session.user.id,
+          partnerIds,
+          message: profileError.message,
+        });
       } else {
         partnerLookup = new Map((partnerProfiles ?? []).map((partner) => [partner.id, partner as PartnerProfileRow]));
       }
@@ -111,6 +115,11 @@ export function useConnection() {
     setConnections(nextConnections);
     setActiveInvites((inviteRows ?? []) as ConnectionInvite[]);
     setIsLoaded(true);
+    console.debug("[connection] state loaded", {
+      userId: session.user.id,
+      connectionCount: nextConnections.length,
+      selectedPartnerId,
+    });
     return {
       connections: nextConnections,
       activeInvites: (inviteRows ?? []) as ConnectionInvite[],

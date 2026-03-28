@@ -165,7 +165,6 @@ export function useNotifications() {
             userId,
             message: profileError.message,
           });
-          setError(profileError.message);
         } else {
           profileLookup = new Map((profileRows ?? []).map((item) => [item.id, item as ProfileRow]));
         }

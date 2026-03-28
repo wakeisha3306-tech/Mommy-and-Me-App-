@@ -1,30 +1,30 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Sparkles, BookHeart, MessageCircleHeart, ChevronRight, ChevronLeft, HeartHandshake, NotebookPen, MessagesSquare, SunMedium, Heart, PenSquare, Send } from "lucide-react";
+import {
+  Sparkles,
+  BookHeart,
+  MessageCircleHeart,
+  ChevronRight,
+  ChevronLeft,
+  HeartHandshake,
+  NotebookPen,
+  MessagesSquare,
+  SunMedium,
+  Heart,
+  PenSquare,
+  Send,
+  Laugh,
+} from "lucide-react";
 import { format } from "date-fns";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@/context/auth-context";
 import { useJournal } from "@/hooks/use-journal";
 import { useAffirmations } from "@/hooks/use-affirmations";
 import { useNotes } from "@/hooks/use-notes";
+import { useRealMoments } from "@/hooks/use-real-moments";
+import { getDailyAffirmation } from "@/lib/affirmations";
 import { formatFriendlyTimestamp, getUserLabel } from "@/lib/utils";
-
-const DAILY_AFFIRMATIONS = [
-  "I am strong and capable 💪🏽",
-  "I am loved and appreciated 💕",
-  "I can get through anything 🌸",
-  "My voice matters 🗣️",
-  "I am growing every day 🌱",
-  "I am enough, exactly as I am ✨",
-  "My love creates a safe place 🏡",
-  "I am raising something beautiful 🌟",
-];
-
-function getDailyAffirmation() {
-  const dayIndex = Math.floor(Date.now() / 86400000) % DAILY_AFFIRMATIONS.length;
-  return DAILY_AFFIRMATIONS[dayIndex];
-}
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -159,6 +159,7 @@ export default function Home() {
   const { entries, isLoaded: journalLoaded } = useJournal();
   const { affirmations, isLoaded: affirmationsLoaded } = useAffirmations();
   const { notes, isLoaded: notesLoaded } = useNotes();
+  const { moments, isLoaded: momentsLoaded, error: momentsError, addMoment } = useRealMoments();
   const affirmation = useMemo(getDailyAffirmation, []);
   const ritual = useMemo(getDailyRitual, []);
   const connectionPrompt = useMemo(getDailyConnectionPrompt, []);
@@ -183,14 +184,14 @@ export default function Home() {
           created_at: entry.created_at,
         })),
       ...affirmations
-        .filter((affirmation) => affirmation.is_favorite)
-        .map((affirmation) => ({
-          id: `affirmation-${affirmation.id}`,
+        .filter((savedAffirmation) => savedAffirmation.is_favorite)
+        .map((savedAffirmation) => ({
+          id: `affirmation-${savedAffirmation.id}`,
           type: "Affirmation",
           href: "/affirmations",
-          text: affirmation.text,
-          meta: affirmation.source === "custom" ? "Custom" : "Saved from deck",
-          created_at: affirmation.created_at,
+          text: savedAffirmation.text,
+          meta: savedAffirmation.source === "custom" ? "Custom" : "Saved from library",
+          created_at: savedAffirmation.created_at,
         })),
       ...notes
         .filter((note) => note.is_favorite)
@@ -208,6 +209,7 @@ export default function Home() {
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 4);
   }, [affirmations, entries, notes]);
+
   const latestMoment = useMemo(() => {
     const items = [
       entries[0] ? { label: "Journal", created_at: entries[0].created_at } : null,
@@ -217,9 +219,41 @@ export default function Home() {
 
     return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] ?? null;
   }, [affirmations, entries, notes]);
+
   const [quoteIndex, setQuoteIndex] = useState(0);
+  const [momentDraft, setMomentDraft] = useState("");
+  const [momentStatus, setMomentStatus] = useState<string | null>(null);
+  const [isSavingMoment, setIsSavingMoment] = useState(false);
   const prevQuote = () => setQuoteIndex((i) => (i - 1 + QUOTES.length) % QUOTES.length);
   const nextQuote = () => setQuoteIndex((i) => (i + 1) % QUOTES.length);
+  const recentMoments = moments.slice(0, 3);
+
+  const saveMoment = async () => {
+    const trimmedMoment = momentDraft.trim();
+
+    if (!trimmedMoment) {
+      setMomentStatus("Write a quick real-life moment first.");
+      return;
+    }
+
+    if (trimmedMoment.length > 180) {
+      setMomentStatus("Keep it short and simple, around 180 characters or less.");
+      return;
+    }
+
+    setIsSavingMoment(true);
+    setMomentStatus(null);
+    const wasSaved = await addMoment(trimmedMoment);
+    setIsSavingMoment(false);
+
+    if (!wasSaved) {
+      setMomentStatus(momentsError ?? "That moment did not save. Please try again.");
+      return;
+    }
+
+    setMomentDraft("");
+    setMomentStatus("Saved. That little moment is tucked away for you.");
+  };
 
   return (
     <Layout>
@@ -234,16 +268,16 @@ export default function Home() {
             <img
               src={`${import.meta.env.BASE_URL}images/mom-baby-art.png`}
               alt="Mother and child"
-              className="w-20 h-20 rounded-full object-cover shadow-md border-2 border-white"
+              className="h-20 w-20 rounded-full border-2 border-white object-cover shadow-md"
             />
             <div className="absolute inset-0 rounded-full ring-2 ring-primary/30" />
           </div>
           <div className="min-w-0">
-            <p className="text-lg font-medium text-foreground leading-tight">
+            <p className="text-lg font-medium leading-tight text-foreground">
               {greeting}, <span className="text-primary">{displayName}</span>
             </p>
-            <h1 className="mt-1 text-3xl font-serif text-foreground leading-tight">Mommy & Me 💕</h1>
-            <p className="text-sm text-muted-foreground mt-1">A safe space, just for us.</p>
+            <h1 className="mt-1 text-3xl font-serif leading-tight text-foreground">Mommy & Me</h1>
+            <p className="mt-1 text-sm text-muted-foreground">A safe space, just for us.</p>
           </div>
         </motion.div>
 
@@ -288,18 +322,21 @@ export default function Home() {
           transition={{ duration: 0.6, delay: 0.1 }}
         >
           <Link href="/affirmations">
-            <div className="relative overflow-hidden rounded-[1.9rem] bg-gradient-to-br from-primary to-primary/80 p-7 shadow-lg cursor-pointer group transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-8 translate-x-8 pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/8 rounded-full translate-y-8 -translate-x-4 pointer-events-none" />
+            <div className="group relative cursor-pointer overflow-hidden rounded-[1.9rem] bg-gradient-to-br from-primary to-primary/80 p-7 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+              <div className="pointer-events-none absolute right-0 top-0 h-32 w-32 translate-x-8 -translate-y-8 rounded-full bg-white/10" />
+              <div className="pointer-events-none absolute bottom-0 left-0 h-24 w-24 -translate-x-4 translate-y-8 rounded-full bg-white/8" />
               <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="w-4 h-4 text-white/80" />
-                  <span className="text-xs text-white/80 font-medium uppercase tracking-widest">Today's Affirmation</span>
+                <div className="mb-3 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-white/80" />
+                  <span className="text-xs font-medium uppercase tracking-widest text-white/80">Daily Affirmation</span>
                 </div>
-                <p className="text-white text-xl font-serif leading-snug">"{affirmation}"</p>
-                <div className="flex items-center gap-1 mt-4 text-white/70 text-xs group-hover:text-white/90 transition-colors">
+                <p className="text-xl font-serif leading-snug text-white">"{affirmation.text}"</p>
+                <p className="mt-3 inline-flex rounded-full bg-white/14 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">
+                  {affirmation.theme}
+                </p>
+                <div className="mt-4 flex items-center gap-1 text-xs text-white/70 transition-colors group-hover:text-white/90">
                   <span>See more</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
+                  <ChevronRight className="h-3.5 w-3.5" />
                 </div>
               </div>
             </div>
@@ -402,6 +439,81 @@ export default function Home() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, delay: 0.24 }}
+          className="app-feature-card p-5"
+        >
+          <div className="relative z-10">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Real Moments</p>
+                <h2 className="mt-2 text-2xl font-serif text-foreground">The little things that feel very us</h2>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/80 text-primary shadow-sm">
+                <Laugh className="h-5 w-5" />
+              </div>
+            </div>
+
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Keep one short, private moment from real life. The eye roll, the hug, the laugh ten minutes later.
+            </p>
+
+            <div className="mt-4 rounded-[1.45rem] border border-white/75 bg-white/84 p-4 shadow-sm">
+              <textarea
+                value={momentDraft}
+                onChange={(event) => setMomentDraft(event.target.value)}
+                maxLength={180}
+                rows={3}
+                placeholder='Like: "She rolled her eyes at me but still hugged me goodnight."'
+                className="min-h-24 w-full resize-none rounded-[1.15rem] border border-border/70 bg-background/80 px-4 py-3 text-sm leading-6 text-foreground outline-none transition focus:border-primary/35 focus:ring-2 focus:ring-primary/15"
+              />
+
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">{momentDraft.trim().length}/180 characters</p>
+                <button
+                  type="button"
+                  onClick={saveMoment}
+                  disabled={isSavingMoment}
+                  className="app-button app-button-primary px-5 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isSavingMoment ? "Saving..." : "Save moment"}
+                </button>
+              </div>
+
+              {momentStatus ? <p className="mt-3 text-sm text-muted-foreground">{momentStatus}</p> : null}
+              {!momentStatus && momentsError ? <p className="mt-3 text-sm text-destructive">{momentsError}</p> : null}
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              {!momentsLoaded ? (
+                <div className="rounded-[1.35rem] border border-white/70 bg-white/76 px-4 py-4">
+                  <p className="text-sm text-muted-foreground">Loading your little moments...</p>
+                </div>
+              ) : recentMoments.length === 0 ? (
+                <div className="rounded-[1.35rem] border border-white/70 bg-white/76 px-4 py-4">
+                  <p className="text-sm text-muted-foreground">
+                    No little moments yet. Save one tiny true story and it will live here.
+                  </p>
+                </div>
+              ) : (
+                recentMoments.map((moment) => (
+                  <div
+                    key={moment.id}
+                    className="rounded-[1.35rem] border border-white/75 bg-white/80 px-4 py-4 shadow-sm"
+                  >
+                    <p className="text-sm leading-6 text-foreground">"{moment.text}"</p>
+                    <p className="mt-3 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                      {formatFriendlyTimestamp(moment.created_at)}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </motion.section>
+
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, delay: 0.28 }}
           className="app-card p-5"
         >
           <div className="flex items-center justify-between gap-3">
@@ -448,15 +560,15 @@ export default function Home() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.26 }}
+          transition={{ delay: 0.3 }}
         >
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest px-1">Our Spaces</p>
+          <p className="px-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Our Spaces</p>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
+          transition={{ duration: 0.5, delay: 0.34 }}
           className="flex flex-col gap-3"
         >
           {QUICK_LINKS.map(({ href, icon: Icon, label, description, color, activeBg }, i) => (
@@ -467,15 +579,15 @@ export default function Home() {
               transition={{ delay: 0.3 + i * 0.08 }}
             >
               <Link href={href}>
-                <div className={`app-card-soft flex items-center gap-4 p-5 ${activeBg} transition-all duration-200 group cursor-pointer hover:-translate-y-0.5 hover:shadow-lg`}>
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
-                    <Icon className="w-6 h-6" />
+                <div className={`app-card-soft group flex cursor-pointer items-center gap-4 p-5 ${activeBg} transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg`}>
+                  <div className={`h-12 w-12 flex-shrink-0 rounded-xl ${color} flex items-center justify-center`}>
+                    <Icon className="h-6 w-6" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground text-base leading-tight">{label}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-base font-semibold leading-tight text-foreground">{label}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
+                  <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
                 </div>
               </Link>
             </motion.div>
@@ -485,29 +597,31 @@ export default function Home() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.66 }}
+          transition={{ delay: 0.7 }}
           className="app-card p-6"
         >
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">Words of Wisdom</p>
-          <p className="font-serif text-foreground text-base leading-relaxed italic mb-3">
+          <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Words of Wisdom</p>
+          <p className="mb-3 text-base font-serif italic leading-relaxed text-foreground">
             "{QUOTES[quoteIndex].text}"
           </p>
           <p className="text-sm font-semibold text-primary">- {QUOTES[quoteIndex].author}</p>
-          <div className="flex items-center justify-between mt-4">
+          <div className="mt-4 flex items-center justify-between">
             <button onClick={prevQuote} className="app-icon-button h-10 w-10 rounded-full border-transparent bg-muted/70 hover:bg-white">
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="h-4 w-4" />
             </button>
             <div className="flex gap-1.5">
               {QUOTES.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => setQuoteIndex(i)}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${i === quoteIndex ? "w-5 bg-primary" : "w-1.5 bg-muted-foreground/30"}`}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    i === quoteIndex ? "w-5 bg-primary" : "w-1.5 bg-muted-foreground/30"
+                  }`}
                 />
               ))}
             </div>
             <button onClick={nextQuote} className="app-icon-button h-10 w-10 rounded-full border-transparent bg-muted/70 hover:bg-white">
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
         </motion.div>

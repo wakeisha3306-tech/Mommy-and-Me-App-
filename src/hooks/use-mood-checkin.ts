@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { endOfDay, startOfDay } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 
@@ -25,6 +24,23 @@ export interface MoodSupportAlert {
 
 const CHECKIN_SELECT = "id, user_id, mood, shared, created_at";
 const ALERT_SELECT = "id, checkin_id, sender_id, recipient_id, sender_role, created_at, viewed_at";
+
+function getUtcDayKey(value: string | Date) {
+  const date = typeof value === "string" ? new Date(value) : value;
+  return date.toISOString().slice(0, 10);
+}
+
+function getMoodErrorMessage(message: string) {
+  if (/mood_checkins_user_day_idx/i.test(message) || /duplicate key value/i.test(message)) {
+    return "You already checked in today, so we updated today's check-in instead.";
+  }
+
+  if (/row-level security/i.test(message) || /policy/i.test(message)) {
+    return "We couldn't update your shared mood alert right now. Please try again in a moment.";
+  }
+
+  return message;
+}
 
 export function getMoodLabel(mood: MoodValue) {
   switch (mood) {
@@ -59,18 +75,8 @@ export function useMoodCheckin() {
     setIsLoaded(false);
     setError(null);
 
-    const dayStart = startOfDay(new Date()).toISOString();
-    const dayEnd = endOfDay(new Date()).toISOString();
-
     const [{ data: checkinRows, error: checkinError }, { data: alertData, error: alertError }] = await Promise.all([
-      supabase
-        .from("mood_checkins")
-        .select(CHECKIN_SELECT)
-        .eq("user_id", session.user.id)
-        .gte("created_at", dayStart)
-        .lte("created_at", dayEnd)
-        .order("created_at", { ascending: false })
-        .limit(1),
+      supabase.from("mood_checkins").select(CHECKIN_SELECT).eq("user_id", session.user.id).order("created_at", { ascending: false }).limit(5),
       supabase
         .from("mood_support_alerts")
         .select(ALERT_SELECT)
@@ -83,12 +89,16 @@ export function useMoodCheckin() {
     if (nextError) {
       setTodayCheckin(null);
       setAlerts([]);
-      setError(nextError.message);
+      setError(getMoodErrorMessage(nextError.message));
       setIsLoaded(true);
       return;
     }
 
-    setTodayCheckin((checkinRows?.[0] as MoodCheckin | undefined) ?? null);
+    const todayUtc = getUtcDayKey(new Date());
+    const latestTodayCheckin =
+      ((checkinRows ?? []) as MoodCheckin[]).find((row) => getUtcDayKey(row.created_at) === todayUtc) ?? null;
+
+    setTodayCheckin(latestTodayCheckin);
     setAlerts((alertData ?? []) as MoodSupportAlert[]);
     setIsLoaded(true);
   }, [session?.user.id]);
@@ -106,44 +116,43 @@ export function useMoodCheckin() {
       setIsSaving(true);
       setError(null);
 
-      const dayStart = startOfDay(new Date()).toISOString();
-      const dayEnd = endOfDay(new Date()).toISOString();
-
-      const { data: existingRows, error: existingError } = await supabase
+      const todayUtc = getUtcDayKey(new Date());
+      const { data: latestRows, error: latestError } = await supabase
         .from("mood_checkins")
         .select(CHECKIN_SELECT)
         .eq("user_id", session.user.id)
-        .gte("created_at", dayStart)
-        .lte("created_at", dayEnd)
         .order("created_at", { ascending: false })
-        .limit(1);
+        .limit(5);
 
-      if (existingError) {
+      if (latestError) {
+        const nextError = getMoodErrorMessage(latestError.message);
         setIsSaving(false);
-        setError(existingError.message);
-        return { error: existingError.message };
+        setError(nextError);
+        return { error: nextError };
       }
 
-      const existingCheckin = (existingRows?.[0] as MoodCheckin | undefined) ?? todayCheckin ?? null;
-      let checkinId = existingCheckin?.id ?? null;
+      const latestTodayCheckin =
+        ((latestRows ?? []) as MoodCheckin[]).find((row) => getUtcDayKey(row.created_at) === todayUtc) ?? todayCheckin ?? null;
 
-      if (existingCheckin?.id) {
+      let savedCheckin: MoodCheckin | null = null;
+
+      if (latestTodayCheckin?.id) {
         const { data, error: updateError } = await supabase
           .from("mood_checkins")
           .update({ mood, shared })
-          .eq("id", existingCheckin.id)
+          .eq("id", latestTodayCheckin.id)
           .eq("user_id", session.user.id)
           .select(CHECKIN_SELECT)
           .single<MoodCheckin>();
 
         if (updateError) {
+          const nextError = getMoodErrorMessage(updateError.message);
           setIsSaving(false);
-          setError(updateError.message);
-          return { error: updateError.message };
+          setError(nextError);
+          return { error: nextError };
         }
 
-        checkinId = data.id;
-        setTodayCheckin(data);
+        savedCheckin = data;
       } else {
         const { data, error: insertError } = await supabase
           .from("mood_checkins")
@@ -157,42 +166,107 @@ export function useMoodCheckin() {
 
         if (insertError) {
           if (/mood_checkins_user_day_idx/i.test(insertError.message) || /duplicate key value/i.test(insertError.message)) {
-            await loadMoodState();
+            const { data: retryRows, error: retryError } = await supabase
+              .from("mood_checkins")
+              .select(CHECKIN_SELECT)
+              .eq("user_id", session.user.id)
+              .order("created_at", { ascending: false })
+              .limit(5);
+
+            if (retryError) {
+              const nextError = getMoodErrorMessage(retryError.message);
+              setIsSaving(false);
+              setError(nextError);
+              return { error: nextError };
+            }
+
+            const retryTodayCheckin =
+              ((retryRows ?? []) as MoodCheckin[]).find((row) => getUtcDayKey(row.created_at) === todayUtc) ?? null;
+
+            if (!retryTodayCheckin?.id) {
+              const nextError = getMoodErrorMessage(insertError.message);
+              setIsSaving(false);
+              setError(nextError);
+              return { error: nextError };
+            }
+
+            const { data: retryData, error: retryUpdateError } = await supabase
+              .from("mood_checkins")
+              .update({ mood, shared })
+              .eq("id", retryTodayCheckin.id)
+              .eq("user_id", session.user.id)
+              .select(CHECKIN_SELECT)
+              .single<MoodCheckin>();
+
+            if (retryUpdateError) {
+              const nextError = getMoodErrorMessage(retryUpdateError.message);
+              setIsSaving(false);
+              setError(nextError);
+              return { error: nextError };
+            }
+
+            savedCheckin = retryData;
+          } else {
+            const nextError = getMoodErrorMessage(insertError.message);
             setIsSaving(false);
-            return saveCheckin(mood, shared, recipientId);
-          }
-
-          setIsSaving(false);
-          setError(insertError.message);
-          return { error: insertError.message };
-        }
-
-        checkinId = data.id;
-        setTodayCheckin(data);
-      }
-
-      if (checkinId) {
-        if (shared && recipientId) {
-          const { error: alertError } = await supabase.from("mood_support_alerts").upsert(
-            {
-              checkin_id: checkinId,
-              sender_id: session.user.id,
-              recipient_id: recipientId,
-              sender_role: profile.role,
-            },
-            { onConflict: "checkin_id,recipient_id" },
-          );
-
-          if (alertError) {
-            setIsSaving(false);
-            setError(alertError.message);
-            return { error: alertError.message };
+            setError(nextError);
+            return { error: nextError };
           }
         } else {
-          await supabase.from("mood_support_alerts").delete().eq("checkin_id", checkinId).eq("sender_id", session.user.id);
+          savedCheckin = data;
         }
       }
 
+      if (!savedCheckin?.id) {
+        setIsSaving(false);
+        setError("We couldn't save your check-in right now.");
+        return { error: "We couldn't save your check-in right now." };
+      }
+
+      if (shared && recipientId) {
+        const { error: deleteAlertError } = await supabase
+          .from("mood_support_alerts")
+          .delete()
+          .eq("checkin_id", savedCheckin.id)
+          .eq("sender_id", session.user.id);
+
+        if (deleteAlertError) {
+          const nextError = getMoodErrorMessage(deleteAlertError.message);
+          setIsSaving(false);
+          setError(nextError);
+          return { error: nextError };
+        }
+
+        const { error: insertAlertError } = await supabase.from("mood_support_alerts").insert({
+          checkin_id: savedCheckin.id,
+          sender_id: session.user.id,
+          recipient_id: recipientId,
+          sender_role: profile.role,
+        });
+
+        if (insertAlertError) {
+          const nextError = getMoodErrorMessage(insertAlertError.message);
+          setIsSaving(false);
+          setError(nextError);
+          return { error: nextError };
+        }
+      } else {
+        const { error: clearAlertError } = await supabase
+          .from("mood_support_alerts")
+          .delete()
+          .eq("checkin_id", savedCheckin.id)
+          .eq("sender_id", session.user.id);
+
+        if (clearAlertError) {
+          const nextError = getMoodErrorMessage(clearAlertError.message);
+          setIsSaving(false);
+          setError(nextError);
+          return { error: nextError };
+        }
+      }
+
+      setTodayCheckin(savedCheckin);
+      await loadMoodState();
       setIsSaving(false);
       return { error: null };
     },
@@ -210,7 +284,7 @@ export function useMoodCheckin() {
         .eq("recipient_id", session.user.id);
 
       if (updateError) {
-        setError(updateError.message);
+        setError(getMoodErrorMessage(updateError.message));
         return false;
       }
 

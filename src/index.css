@@ -215,6 +215,43 @@
       0 8px 14px -12px hsl(20 30% 18% / 0.12);
   }
 
+  .app-feature-card {
+    @apply relative overflow-hidden rounded-[2rem] border border-white/50 bg-gradient-to-br from-white via-white/96 to-secondary/55 shadow-lg backdrop-blur-sm;
+    box-shadow:
+      0 24px 60px -34px hsl(20 30% 18% / 0.24),
+      0 12px 24px -18px hsl(350 52% 62% / 0.2);
+  }
+
+  .app-feature-card::before {
+    content: "";
+    position: absolute;
+    inset: auto -8% -42% auto;
+    width: 180px;
+    height: 180px;
+    border-radius: 999px;
+    background: radial-gradient(circle, hsl(var(--accent) / 0.18), transparent 68%);
+    pointer-events: none;
+  }
+
+  .app-feature-card::after {
+    content: "";
+    position: absolute;
+    inset: -22% auto auto -8%;
+    width: 150px;
+    height: 150px;
+    border-radius: 999px;
+    background: radial-gradient(circle, hsl(var(--primary) / 0.14), transparent 70%);
+    pointer-events: none;
+  }
+
+  .app-mini-pill {
+    @apply inline-flex items-center rounded-full border border-white/70 bg-white/80 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground shadow-sm backdrop-blur-sm;
+  }
+
+  .app-stat-tile {
+    @apply rounded-[1.35rem] border border-white/75 bg-white/82 p-4 shadow-sm backdrop-blur-sm;
+  }
+
   .app-button {
     @apply min-h-12 rounded-2xl px-6 py-3 text-sm font-semibold transition-all duration-200;
   }

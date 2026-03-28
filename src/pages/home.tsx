@@ -1,10 +1,14 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Sparkles, BookHeart, MessageCircleHeart, ChevronRight, ChevronLeft } from "lucide-react";
+import { Sparkles, BookHeart, MessageCircleHeart, ChevronRight, ChevronLeft, HeartHandshake, NotebookPen, MessagesSquare, SunMedium } from "lucide-react";
+import { format } from "date-fns";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@/context/auth-context";
-import { getUserLabel } from "@/lib/utils";
+import { useJournal } from "@/hooks/use-journal";
+import { useAffirmations } from "@/hooks/use-affirmations";
+import { useNotes } from "@/hooks/use-notes";
+import { formatFriendlyTimestamp, getUserLabel } from "@/lib/utils";
 
 const DAILY_AFFIRMATIONS = [
   "I am strong and capable 💪🏽",
@@ -99,14 +103,65 @@ const QUICK_LINKS = [
   },
 ];
 
+const DAILY_RITUALS = [
+  {
+    title: "Start with one gentle truth",
+    body: "Pick one loving thought to carry with you today, even if everything else feels busy.",
+    actions: [
+      { href: "/affirmations", label: "Pick an affirmation" },
+      { href: "/journal", label: "Write a quick check-in" },
+      { href: "/notes", label: "Send a soft note" },
+    ],
+  },
+  {
+    title: "Make space for a small moment",
+    body: "A few honest words or one kind note can turn the whole day around.",
+    actions: [
+      { href: "/notes", label: "Share a message" },
+      { href: "/journal", label: "Capture the feeling" },
+      { href: "/affirmations", label: "Save encouragement" },
+    ],
+  },
+  {
+    title: "Let today feel held",
+    body: "You don't need a perfect plan. Just one meaningful moment together is enough.",
+    actions: [
+      { href: "/journal", label: "Reflect for a minute" },
+      { href: "/affirmations", label: "Choose steady words" },
+      { href: "/notes", label: "Leave love behind" },
+    ],
+  },
+];
+
+function getDailyRitual() {
+  const dayIndex = Math.floor(Date.now() / 86400000) % DAILY_RITUALS.length;
+  return DAILY_RITUALS[dayIndex];
+}
+
 export default function Home() {
   const { session, profile } = useAuth();
+  const { entries, isLoaded: journalLoaded } = useJournal();
+  const { affirmations, isLoaded: affirmationsLoaded } = useAffirmations();
+  const { notes, isLoaded: notesLoaded } = useNotes();
   const affirmation = useMemo(getDailyAffirmation, []);
+  const ritual = useMemo(getDailyRitual, []);
   const greeting = useMemo(getGreeting, []);
   const displayName = useMemo(
     () => getUserLabel(profile?.display_name, session?.user.email),
     [profile?.display_name, session?.user.email],
   );
+  const todayLabel = useMemo(() => format(new Date(), "EEEE, MMMM d"), []);
+  const allMomentsLoaded = journalLoaded && affirmationsLoaded && notesLoaded;
+  const totalMoments = entries.length + affirmations.length + notes.length;
+  const latestMoment = useMemo(() => {
+    const items = [
+      entries[0] ? { label: "Journal", created_at: entries[0].created_at } : null,
+      affirmations[0] ? { label: "Affirmation", created_at: affirmations[0].created_at } : null,
+      notes[0] ? { label: "Note", created_at: notes[0].created_at } : null,
+    ].filter(Boolean) as Array<{ label: string; created_at: string }>;
+
+    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] ?? null;
+  }, [affirmations, entries, notes]);
   const [quoteIndex, setQuoteIndex] = useState(0);
   const prevQuote = () => setQuoteIndex((i) => (i - 1 + QUOTES.length) % QUOTES.length);
   const nextQuote = () => setQuoteIndex((i) => (i + 1) % QUOTES.length);
@@ -137,6 +192,41 @@ export default function Home() {
           </div>
         </motion.div>
 
+        <motion.section
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.08 }}
+          className="app-feature-card p-6"
+        >
+          <div className="relative z-10">
+            <div className="flex items-center justify-between gap-3">
+              <span className="app-mini-pill">Today together</span>
+              <span className="text-xs font-medium text-muted-foreground">{todayLabel}</span>
+            </div>
+
+            <div className="mt-5 flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+                <HeartHandshake className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-serif leading-tight text-foreground">{ritual.title}</h2>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{ritual.body}</p>
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              {ritual.actions.map((action) => (
+                <Link key={action.href} href={action.href}>
+                  <span className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-primary/12 bg-white/84 px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-white">
+                    <SunMedium className="h-4 w-4 text-primary" />
+                    {action.label}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </motion.section>
+
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -160,6 +250,57 @@ export default function Home() {
             </div>
           </Link>
         </motion.div>
+
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, delay: 0.16 }}
+          className="app-card p-5"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Shared Snapshot</p>
+              <h2 className="mt-2 text-2xl font-serif text-foreground">Your space in bloom</h2>
+            </div>
+            <div className="rounded-2xl bg-primary/10 px-4 py-3 text-right">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">Moments kept</p>
+              <p className="mt-1 text-2xl font-serif text-primary">{totalMoments}</p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            <div className="app-stat-tile">
+              <NotebookPen className="h-4 w-4 text-primary" />
+              <p className="mt-3 text-2xl font-serif text-foreground">{entries.length}</p>
+              <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">Journal</p>
+            </div>
+            <div className="app-stat-tile">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <p className="mt-3 text-2xl font-serif text-foreground">{affirmations.length}</p>
+              <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">Affirmations</p>
+            </div>
+            <div className="app-stat-tile">
+              <MessagesSquare className="h-4 w-4 text-primary" />
+              <p className="mt-3 text-2xl font-serif text-foreground">{notes.length}</p>
+              <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">Notes</p>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-[1.35rem] border border-border/70 bg-muted/28 px-4 py-3">
+            {!allMomentsLoaded ? (
+              <p className="text-sm text-muted-foreground">Gathering your latest moments...</p>
+            ) : latestMoment ? (
+              <p className="text-sm text-muted-foreground">
+                Latest moment: <span className="font-semibold text-foreground">{latestMoment.label}</span>{" "}
+                {formatFriendlyTimestamp(latestMoment.created_at)}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Your first saved moment will show up here and make this space feel even more yours.
+              </p>
+            )}
+          </div>
+        </motion.section>
 
         <motion.div
           initial={{ opacity: 0 }}

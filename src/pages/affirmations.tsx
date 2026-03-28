@@ -1,54 +1,63 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCcw, ChevronLeft, ChevronRight, Heart, Plus, Trash2 } from "lucide-react";
+import { RefreshCcw, ChevronLeft, ChevronRight, Heart, Plus, Trash2, Share2 } from "lucide-react";
+import { ShareMomentDialog } from "@/components/share-moment-dialog";
 import { Layout } from "@/components/layout";
 import { ContentState } from "@/components/content-state";
 import { useAffirmations } from "@/hooks/use-affirmations";
 import { toast } from "@/hooks/use-toast";
+import { PRESET_AFFIRMATIONS } from "@/lib/affirmations";
+import type { ShareCardContent } from "@/lib/share-card";
 import { formatFriendlyTimestamp } from "@/lib/utils";
-
-const AFFIRMATIONS = [
-  { text: "I am strong and capable", emoji: "💪🏽" },
-  { text: "I am loved and appreciated", emoji: "💕" },
-  { text: "I can get through anything", emoji: "🌸" },
-  { text: "My voice matters", emoji: "🗣️" },
-  { text: "I am growing every day", emoji: "🌱" },
-  { text: "I am enough, exactly as I am", emoji: "✨" },
-  { text: "My love creates a safe place", emoji: "🏡" },
-  { text: "I deserve peace and rest", emoji: "🌙" },
-  { text: "I lead with grace and strength", emoji: "👑" },
-  { text: "I am worthy of good things", emoji: "🌟" },
-];
 
 export default function Affirmations() {
   const { affirmations, isLoaded, addAffirmation, deleteAffirmation, toggleFavorite } = useAffirmations();
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(1);
   const [customAffirmation, setCustomAffirmation] = useState("");
+  const [shareItem, setShareItem] = useState<ShareCardContent | null>(null);
+  const [rotationPool, setRotationPool] = useState<number[]>([]);
+
+  const shuffledIndices = useCallback((excludeIndex?: number) => {
+    const indices = PRESET_AFFIRMATIONS.map((_, itemIndex) => itemIndex).filter((itemIndex) => itemIndex !== excludeIndex);
+
+    for (let currentIndex = indices.length - 1; currentIndex > 0; currentIndex -= 1) {
+      const randomIndex = Math.floor(Math.random() * (currentIndex + 1));
+      [indices[currentIndex], indices[randomIndex]] = [indices[randomIndex], indices[currentIndex]];
+    }
+
+    return indices;
+  }, []);
 
   const next = useCallback(() => {
     setDirection(1);
-    setIndex((prev) => (prev + 1) % AFFIRMATIONS.length);
+    setIndex((prev) => (prev + 1) % PRESET_AFFIRMATIONS.length);
+    setRotationPool([]);
   }, []);
 
   const prev = useCallback(() => {
     setDirection(-1);
-    setIndex((prev) => (prev - 1 + AFFIRMATIONS.length) % AFFIRMATIONS.length);
+    setIndex((prev) => (prev - 1 + PRESET_AFFIRMATIONS.length) % PRESET_AFFIRMATIONS.length);
+    setRotationPool([]);
   }, []);
 
-  const shuffle = useCallback(() => {
+  const generateAnother = useCallback(() => {
     setDirection(1);
-    setIndex((prev) => {
-      let nextIndex = Math.floor(Math.random() * AFFIRMATIONS.length);
-      while (nextIndex === prev) {
-        nextIndex = Math.floor(Math.random() * AFFIRMATIONS.length);
-      }
-      return nextIndex;
-    });
-  }, []);
+    setRotationPool((currentPool) => {
+      const nextPool = currentPool.length > 0 ? currentPool : shuffledIndices(index);
+      const [nextIndex, ...remainingPool] = nextPool;
 
-  const current = AFFIRMATIONS[index];
+      if (typeof nextIndex === "number") {
+        setIndex(nextIndex);
+      }
+
+      return remainingPool;
+    });
+  }, [index, shuffledIndices]);
+
+  const current = PRESET_AFFIRMATIONS[index];
   const alreadySaved = affirmations.some((affirmation) => affirmation.text === current.text);
+  const libraryCount = useMemo(() => PRESET_AFFIRMATIONS.length, []);
 
   const handleSaveCurrent = async () => {
     if (alreadySaved) {
@@ -83,9 +92,10 @@ export default function Affirmations() {
   };
 
   return (
-    <Layout title="Affirmations" subtitle="Words to carry you through the day">
+    <Layout title="Affirmations" subtitle="Words that meet you with comfort, truth, and care">
       <div className="flex-1 section-stack mt-4">
-        <div className="relative h-72 flex items-center justify-center perspective-[1000px]">
+        <ShareMomentDialog item={shareItem} onClose={() => setShareItem(null)} />
+        <div className="relative h-80 flex items-center justify-center perspective-[1000px]">
           <AnimatePresence mode="wait" custom={direction}>
             <motion.div
               key={index}
@@ -94,25 +104,29 @@ export default function Affirmations() {
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: direction * -60, scale: 0.95 }}
               transition={{ duration: 0.4, ease: "easeOut" }}
-              className="app-card absolute inset-0 p-8 flex flex-col items-center justify-center text-center gap-4 overflow-hidden"
+              className="app-card absolute inset-0 flex flex-col items-center justify-center gap-4 overflow-hidden p-8 text-center"
             >
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary/40 via-accent/60 to-primary/40 rounded-t-[2rem]" />
+              <div className="absolute left-0 right-0 top-0 h-1 rounded-t-[2rem] bg-gradient-to-r from-primary/40 via-accent/60 to-primary/40" />
               <span className="text-6xl">{current.emoji}</span>
-              <p className="text-2xl font-serif text-foreground leading-snug">"{current.text}"</p>
-              <p className="text-xs text-muted-foreground mt-2">
-                {index + 1} of {AFFIRMATIONS.length}
+              <p className="text-2xl font-serif leading-snug text-foreground">"{current.text}"</p>
+              <p className="rounded-full bg-primary/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+                {current.theme}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {index + 1} of {libraryCount}
               </p>
             </motion.div>
           </AnimatePresence>
         </div>
 
         <div className="flex justify-center gap-2">
-          {AFFIRMATIONS.map((_, itemIndex) => (
+          {PRESET_AFFIRMATIONS.map((_, itemIndex) => (
             <button
               key={itemIndex}
               onClick={() => {
                 setDirection(itemIndex > index ? 1 : -1);
                 setIndex(itemIndex);
+                setRotationPool([]);
               }}
               className={`h-2 rounded-full transition-all duration-300 ${
                 itemIndex === index ? "w-6 bg-primary" : "w-2 bg-muted-foreground/30"
@@ -122,26 +136,20 @@ export default function Affirmations() {
         </div>
 
         <div className="flex items-center justify-between gap-4">
-          <button
-            onClick={prev}
-            className="app-icon-button w-14 h-14"
-          >
-            <ChevronLeft className="w-6 h-6" />
+          <button onClick={prev} className="app-icon-button h-14 w-14">
+            <ChevronLeft className="h-6 w-6" />
           </button>
 
           <button
-            onClick={shuffle}
-            className="app-button-primary flex-1 flex items-center justify-center gap-2 h-14 rounded-[2rem] text-base"
+            onClick={generateAnother}
+            className="app-button-primary flex h-14 flex-1 items-center justify-center gap-2 rounded-[2rem] text-base"
           >
-            <RefreshCcw className="w-5 h-5" />
-            Shuffle
+            <RefreshCcw className="h-5 w-5" />
+            Generate another affirmation
           </button>
 
-          <button
-            onClick={next}
-            className="app-icon-button w-14 h-14"
-          >
-            <ChevronRight className="w-6 h-6" />
+          <button onClick={next} className="app-icon-button h-14 w-14">
+            <ChevronRight className="h-6 w-6" />
           </button>
         </div>
 
@@ -153,44 +161,67 @@ export default function Affirmations() {
             <Heart className="h-4 w-4" />
             {alreadySaved ? "Saved to your collection" : "Save this affirmation"}
           </button>
-          <button
-            onClick={shuffle}
-            className="app-button-secondary rounded-[1.5rem] px-4"
-          >
-            New pick
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() =>
+                setShareItem({
+                  label: "Affirmation",
+                  text: current.text,
+                  tagline: "A moment that mattered",
+                })
+              }
+              className="app-button rounded-[1.5rem] border border-primary/15 bg-white/85 px-4 text-foreground transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-white"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Share2 className="h-4 w-4 text-primary" />
+                Share 💛
+              </span>
+            </button>
+            <button onClick={generateAnother} className="app-button-secondary rounded-[1.5rem] px-4">
+              Another one
+            </button>
+          </div>
         </div>
 
         <div className="mt-2">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3 px-1">All Affirmations</p>
+          <div className="mb-3 flex items-center justify-between gap-3 px-1">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Affirmation Library</p>
+            <p className="text-xs text-muted-foreground">{libraryCount} affirmations</p>
+          </div>
           <div className="flex flex-col gap-2">
-            {AFFIRMATIONS.map((affirmation, itemIndex) => (
+            {PRESET_AFFIRMATIONS.map((affirmation, itemIndex) => (
               <motion.button
                 key={itemIndex}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: itemIndex * 0.04 }}
+                transition={{ delay: itemIndex * 0.02 }}
                 onClick={() => {
                   setDirection(itemIndex > index ? 1 : -1);
                   setIndex(itemIndex);
+                  setRotationPool([]);
                 }}
-                className={`flex items-center gap-3 p-4 rounded-2xl text-left transition-all duration-200 border ${
+                className={`flex items-center gap-3 rounded-2xl border p-4 text-left transition-all duration-200 ${
                   itemIndex === index
-                    ? "bg-primary/10 border-primary/30 shadow-md"
-                    : "bg-white border-border hover:bg-muted/50 hover:border-border hover:-translate-y-0.5 hover:shadow-md"
+                    ? "border-primary/30 bg-primary/10 shadow-md"
+                    : "border-border bg-white hover:-translate-y-0.5 hover:border-border hover:bg-muted/50 hover:shadow-md"
                 }`}
               >
                 <span className="text-2xl">{affirmation.emoji}</span>
-                <span className={`text-sm font-medium ${itemIndex === index ? "text-primary" : "text-foreground"}`}>
-                  {affirmation.text}
-                </span>
+                <div className="min-w-0">
+                  <p className={`text-sm font-medium ${itemIndex === index ? "text-primary" : "text-foreground"}`}>
+                    {affirmation.text}
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    {affirmation.theme}
+                  </p>
+                </div>
               </motion.button>
             ))}
           </div>
         </div>
 
         <div className="app-card p-5">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Save Your Own</p>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Save Your Own</p>
           <div className="flex gap-3">
             <textarea
               value={customAffirmation}
@@ -209,7 +240,7 @@ export default function Affirmations() {
         </div>
 
         <div className="mt-2">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3 px-1">Saved For You</p>
+          <p className="mb-3 px-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Saved For You</p>
           {!isLoaded ? (
             <ContentState message="Loading affirmations..." loading />
           ) : affirmations.length === 0 ? (
@@ -221,14 +252,27 @@ export default function Affirmations() {
                   <div>
                     <p className="text-xl">{affirmation.emoji ?? "✨"}</p>
                     <p className="mt-2 text-sm font-medium leading-relaxed text-foreground">{affirmation.text}</p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {formatFriendlyTimestamp(affirmation.created_at)}
-                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">{formatFriendlyTimestamp(affirmation.created_at)}</p>
                     <p className="mt-2 text-xs uppercase tracking-widest text-muted-foreground">
-                      {affirmation.source === "custom" ? "Custom" : "Saved from deck"}
+                      {affirmation.source === "custom" ? "Custom" : "Saved from library"}
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
+                    <button
+                      onClick={() =>
+                        setShareItem({
+                          label: "Affirmation",
+                          text: affirmation.text,
+                          tagline: "A moment that mattered",
+                        })
+                      }
+                      className="rounded-xl px-2.5 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-primary/8 hover:text-primary"
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        <Share2 className="h-3.5 w-3.5" />
+                        Share 💛
+                      </span>
+                    </button>
                     <button
                       onClick={() => {
                         void toggleFavorite(affirmation.id, !affirmation.is_favorite);

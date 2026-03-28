@@ -15,7 +15,9 @@ import {
   PenSquare,
   Send,
   Laugh,
+  Share2,
 } from "lucide-react";
+import { ShareMomentDialog } from "@/components/share-moment-dialog";
 import { format } from "date-fns";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@/context/auth-context";
@@ -24,6 +26,7 @@ import { useAffirmations } from "@/hooks/use-affirmations";
 import { useNotes } from "@/hooks/use-notes";
 import { useRealMoments } from "@/hooks/use-real-moments";
 import { getDailyAffirmation } from "@/lib/affirmations";
+import type { ShareCardContent } from "@/lib/share-card";
 import { formatFriendlyTimestamp, getUserLabel } from "@/lib/utils";
 
 function getGreeting() {
@@ -224,6 +227,7 @@ export default function Home() {
   const [momentDraft, setMomentDraft] = useState("");
   const [momentStatus, setMomentStatus] = useState<string | null>(null);
   const [isSavingMoment, setIsSavingMoment] = useState(false);
+  const [shareItem, setShareItem] = useState<ShareCardContent | null>(null);
   const prevQuote = () => setQuoteIndex((i) => (i - 1 + QUOTES.length) % QUOTES.length);
   const nextQuote = () => setQuoteIndex((i) => (i + 1) % QUOTES.length);
   const recentMoments = moments.slice(0, 3);
@@ -258,6 +262,7 @@ export default function Home() {
   return (
     <Layout>
       <div className="section-stack pb-6">
+        <ShareMomentDialog item={shareItem} onClose={() => setShareItem(null)} />
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -500,9 +505,27 @@ export default function Home() {
                     className="rounded-[1.35rem] border border-white/75 bg-white/80 px-4 py-4 shadow-sm"
                   >
                     <p className="text-sm leading-6 text-foreground">"{moment.text}"</p>
-                    <p className="mt-3 text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                      {formatFriendlyTimestamp(moment.created_at)}
-                    </p>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                        {formatFriendlyTimestamp(moment.created_at)}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShareItem({
+                            label: "Real Moment",
+                            text: moment.text,
+                            tagline: "A moment that mattered",
+                          })
+                        }
+                        className="rounded-full border border-white/70 bg-white px-3 py-1.5 text-[11px] font-semibold text-muted-foreground shadow-sm transition-all duration-200 hover:text-primary"
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <Share2 className="h-3 w-3" />
+                          Share 💛
+                        </span>
+                      </button>
+                    </div>
                   </div>
                 ))
               )}

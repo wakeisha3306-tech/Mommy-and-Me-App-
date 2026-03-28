@@ -1,729 +1,504 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "wouter";
-import { motion } from "framer-motion";
-import {
-  Sparkles,
-  BookHeart,
-  MessageCircleHeart,
-  ChevronRight,
-  ChevronLeft,
-  HeartHandshake,
-  NotebookPen,
-  MessagesSquare,
-  SunMedium,
-  Heart,
-  PenSquare,
-  Send,
-  Laugh,
-  Share2,
-  X,
-} from "lucide-react";
-import { ShareMomentDialog } from "@/components/share-moment-dialog";
-import { format } from "date-fns";
+import { Link, useLocation } from "wouter";
+import { Bell, BookHeart, MessageCircleHeart, Sparkles, Star, Users } from "lucide-react";
 import { Layout } from "@/components/layout";
+import { MoodCard } from "@/components/mood-card";
+import { ShareMomentDialog } from "@/components/share-moment-dialog";
+import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
-import { useJournal } from "@/hooks/use-journal";
 import { useAffirmations } from "@/hooks/use-affirmations";
+import { useConnection } from "@/hooks/use-connection";
+import { NEED_TO_TALK_MESSAGE, useDirectMessages } from "@/hooks/use-direct-messages";
+import { useJournal } from "@/hooks/use-journal";
+import { useMoodCheckin, type MoodValue } from "@/hooks/use-mood-checkin";
 import { useNotes } from "@/hooks/use-notes";
 import { useRealMoments } from "@/hooks/use-real-moments";
-import { useDirectMessages } from "@/hooks/use-direct-messages";
-import { getDailyAffirmation } from "@/lib/affirmations";
 import { APP_NAME, APP_TAGLINE, SHARE_CARD_TAGLINE } from "@/lib/brand";
+import { getDailyAffirmation } from "@/lib/affirmations";
 import type { ShareCardContent } from "@/lib/share-card";
 import { formatFriendlyTimestamp, getUserLabel } from "@/lib/utils";
 
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
+type WaitingItem = {
+  id: string;
+  title: string;
+  body: string;
+  href: string;
+  kind: "alert" | "message" | "between_us" | "family" | "memory";
+  onOpen?: () => Promise<void> | void;
+};
 
-const QUOTES = [
-  {
-    text: "You may not control all the events that happen to you, but you can decide not to be reduced by them.",
-    author: "Maya Angelou",
-  },
-  {
-    text: "When they go low, we go high.",
-    author: "Michelle Obama",
-  },
-  {
-    text: "I was the conductor of the Underground Railroad for eight years, and I can say what most conductors can't say - I never ran my train off the track and I never lost a passenger.",
-    author: "Harriet Tubman",
-  },
-  {
-    text: "I am not free while any woman is unfree, even when her shackles are very different from my own.",
-    author: "Audre Lorde",
-  },
-  {
-    text: "The time is always right to do what is right.",
-    author: "Coretta Scott King",
-  },
-  {
-    text: "If you have some power, then your job is to empower somebody else.",
-    author: "Toni Morrison",
-  },
-  {
-    text: "We need to reshape our own perception of how we view ourselves. We have to step up as women and take the lead.",
-    author: "Beyonce",
-  },
-  {
-    text: "Think like a queen. A queen is not afraid to fail. Failure is another stepping stone to greatness.",
-    author: "Oprah Winfrey",
-  },
-  {
-    text: "I am no longer accepting the things I cannot change. I am changing the things I cannot accept.",
-    author: "Angela Davis",
-  },
-  {
-    text: "Love takes off the masks that we fear we cannot live without and know we cannot live within.",
-    author: "James Baldwin",
-  },
+const DAILY_PROMPTS = [
+  "What felt tender or meaningful between you lately?",
+  "What is one small thing you wish they understood today?",
+  "What made you feel cared for this week?",
+  "What is one truth your heart wants to say gently?",
 ];
 
-const QUICK_LINKS = [
-  {
-    href: "/affirmations",
-    icon: Sparkles,
-    label: "Daily Affirmations",
-    description: "Words to carry you through",
-    color: "bg-primary/10 text-primary",
-    activeBg: "hover:bg-primary/15",
-  },
-  {
-    href: "/journal",
-    icon: BookHeart,
-    label: "My Journal",
-    description: "A space for your thoughts",
-    color: "bg-accent/15 text-accent-foreground",
-    activeBg: "hover:bg-accent/20",
-  },
-  {
-    href: "/notes",
-    icon: MessageCircleHeart,
-    label: "Our Notes",
-    description: "Messages between us",
-    color: "bg-secondary text-secondary-foreground",
-    activeBg: "hover:bg-secondary/80",
-  },
-];
-
-const DAILY_RITUALS = [
-  {
-    title: "Start with one gentle truth",
-    body: "Pick one loving thought to carry with you today, even if everything else feels busy.",
-    actions: [
-      { href: "/affirmations", label: "Pick an affirmation" },
-      { href: "/journal", label: "Write a quick check-in" },
-      { href: "/notes", label: "Send a soft note" },
-    ],
-  },
-  {
-    title: "Make space for a small moment",
-    body: "A few honest words or one kind note can turn the whole day around.",
-    actions: [
-      { href: "/notes", label: "Share a message" },
-      { href: "/journal", label: "Capture the feeling" },
-      { href: "/affirmations", label: "Save encouragement" },
-    ],
-  },
-  {
-    title: "Let today feel held",
-    body: "You don't need a perfect plan. Just one meaningful moment together is enough.",
-    actions: [
-      { href: "/journal", label: "Reflect for a minute" },
-      { href: "/affirmations", label: "Choose steady words" },
-      { href: "/notes", label: "Leave love behind" },
-    ],
-  },
-];
-
-const DAILY_CONNECTION_PROMPTS = [
-  "What is one thing you want each other to remember today?",
-  "What made you feel most loved lately?",
-  "What would make today feel a little softer for you?",
-  "What is one small win you want to celebrate together?",
-  "What do you want to say thank you for today?",
-  "What feeling deserves a little more space right now?",
-  "What is one memory you never want to lose?",
-  "What would help you feel supported today?",
-];
-
-function getDailyRitual() {
-  const dayIndex = Math.floor(Date.now() / 86400000) % DAILY_RITUALS.length;
-  return DAILY_RITUALS[dayIndex];
-}
-
-function getDailyConnectionPrompt() {
-  const dayIndex = Math.floor(Date.now() / 86400000) % DAILY_CONNECTION_PROMPTS.length;
-  return DAILY_CONNECTION_PROMPTS[dayIndex];
-}
+const WAITING_STORAGE_KEY = "between-us-last-viewed-waiting";
+const WELCOME_STORAGE_KEY = "between-us-show-welcome";
 
 export default function Home() {
+  const [, navigate] = useLocation();
   const { session, profile } = useAuth();
-  const { entries, isLoaded: journalLoaded } = useJournal();
-  const { affirmations, isLoaded: affirmationsLoaded } = useAffirmations();
-  const { privateNotes, sharedNotes, receivedSharedNotes, isLoaded: notesLoaded } = useNotes();
-  const { receivedMessages, isLoaded: messagesLoaded } = useDirectMessages();
-  const { moments, isLoaded: momentsLoaded, error: momentsError, addMoment } = useRealMoments();
-  const affirmation = useMemo(getDailyAffirmation, []);
-  const ritual = useMemo(getDailyRitual, []);
-  const connectionPrompt = useMemo(getDailyConnectionPrompt, []);
-  const greeting = useMemo(getGreeting, []);
-  const displayName = useMemo(
-    () => getUserLabel(profile?.display_name, session?.user.email),
-    [profile?.display_name, session?.user.email],
-  );
-  const todayLabel = useMemo(() => format(new Date(), "EEEE, MMMM d"), []);
-  const allMomentsLoaded = journalLoaded && affirmationsLoaded && notesLoaded;
-  const totalMoments = entries.length + affirmations.length + privateNotes.length + sharedNotes.length;
-  const favoriteMoments = useMemo(() => {
-    const favorites = [
-      ...entries
-        .filter((entry) => entry.is_favorite)
-        .map((entry) => ({
-          id: `journal-${entry.id}`,
-          type: "Journal",
-          href: "/journal",
-          text: entry.text,
-          meta: entry.author,
-          created_at: entry.created_at,
-        })),
-      ...affirmations
-        .filter((savedAffirmation) => savedAffirmation.is_favorite)
-        .map((savedAffirmation) => ({
-          id: `affirmation-${savedAffirmation.id}`,
-          type: "Affirmation",
-          href: "/affirmations",
-          text: savedAffirmation.text,
-          meta: savedAffirmation.source === "custom" ? "Custom" : "Saved from library",
-          created_at: savedAffirmation.created_at,
-        })),
-      ...[...privateNotes, ...sharedNotes]
-        .filter((note) => note.is_favorite)
-        .map((note) => ({
-          id: `note-${note.id}`,
-          type: "Note",
-          href: "/notes",
-          text: note.text,
-          meta: note.author,
-          created_at: note.created_at,
-        })),
-    ];
+  const { entries } = useJournal();
+  const { affirmations } = useAffirmations();
+  const { moments, addMoment } = useRealMoments();
+  const {
+    notes,
+    privateNotes,
+    betweenUsNotes,
+    familyNotes,
+    latestReceivedBetweenUsNote,
+    latestReceivedFamilyNote,
+  } = useNotes();
+  const { latestReceivedMessage } = useDirectMessages();
+  const { connection, partnerRole } = useConnection();
+  const { todayCheckin, latestAlert, isSaving, saveCheckin, markAlertViewed } = useMoodCheckin();
 
-    return favorites
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 4);
-  }, [affirmations, entries, privateNotes, sharedNotes]);
-
-  const latestMoment = useMemo(() => {
-    const items = [
-      entries[0] ? { label: "Journal", created_at: entries[0].created_at } : null,
-      affirmations[0] ? { label: "Affirmation", created_at: affirmations[0].created_at } : null,
-      [...privateNotes, ...sharedNotes]
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
-        ? {
-            label: "Note",
-            created_at: [...privateNotes, ...sharedNotes].sort(
-              (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-            )[0].created_at,
-          }
-        : null,
-    ].filter(Boolean) as Array<{ label: string; created_at: string }>;
-
-    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] ?? null;
-  }, [affirmations, entries, privateNotes, sharedNotes]);
-
-  const [quoteIndex, setQuoteIndex] = useState(0);
-  const [momentDraft, setMomentDraft] = useState("");
-  const [momentStatus, setMomentStatus] = useState<string | null>(null);
+  const [shareMood, setShareMood] = useState(todayCheckin?.shared ?? false);
+  const [realMomentDraft, setRealMomentDraft] = useState("");
   const [isSavingMoment, setIsSavingMoment] = useState(false);
   const [shareItem, setShareItem] = useState<ShareCardContent | null>(null);
-  const [dismissedInboxItemId, setDismissedInboxItemId] = useState<string | null>(null);
-  const prevQuote = () => setQuoteIndex((i) => (i - 1 + QUOTES.length) % QUOTES.length);
-  const nextQuote = () => setQuoteIndex((i) => (i + 1) % QUOTES.length);
-  const recentMoments = moments.slice(0, 3);
-
-  const latestIncomingItem = useMemo(() => {
-    const items = [
-      ...receivedSharedNotes.map((note) => ({
-        id: `shared-${note.id}`,
-        created_at: note.created_at,
-        href: "/notes?tab=shared",
-        message: `You received something from ${note.author} 💛`,
-      })),
-      ...receivedMessages.map((message) => ({
-        id: `dm-${message.id}`,
-        created_at: message.created_at,
-        href: "/notes?tab=direct",
-        message: `You received a message from ${message.sender_role} 💛`,
-      })),
-    ];
-
-    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] ?? null;
-  }, [receivedMessages, receivedSharedNotes]);
+  const [dismissedWaitingId, setDismissedWaitingId] = useState<string | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
-    if (!latestIncomingItem || typeof window === "undefined") return;
-    const storedDismissedId = window.localStorage.getItem("between-us-last-dismissed-inbox-item");
-    setDismissedInboxItemId(storedDismissedId);
-  }, [latestIncomingItem]);
+    setShareMood(todayCheckin?.shared ?? false);
+  }, [todayCheckin?.shared]);
 
-  const activeInboxBanner =
-    notesLoaded && messagesLoaded && latestIncomingItem && latestIncomingItem.id !== dismissedInboxItemId
-      ? latestIncomingItem
-      : null;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setDismissedWaitingId(window.localStorage.getItem(WAITING_STORAGE_KEY));
+    setShowWelcome(window.localStorage.getItem(WELCOME_STORAGE_KEY) === "true");
+  }, []);
 
-  const saveMoment = async () => {
-    const trimmedMoment = momentDraft.trim();
+  const displayName = getUserLabel(profile?.display_name, session?.user.email);
+  const firstName = displayName.split(" ")[0] ?? displayName;
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const activePartnerLabel = useMemo(
+    () => getUserLabel(connection?.partner_name, connection?.partner_email ?? undefined),
+    [connection?.partner_email, connection?.partner_name],
+  );
+  const partnerLabel = activePartnerLabel ?? partnerRole ?? "your person";
+  const dailyAffirmation = getDailyAffirmation();
+  const dailyPrompt = DAILY_PROMPTS[Math.floor(Date.now() / 86400000) % DAILY_PROMPTS.length];
 
-    if (!trimmedMoment) {
-      setMomentStatus("Write a quick real-life moment first.");
+  const journalHref = `/journal?prompt=${encodeURIComponent("Here is what I want to hold from today...")}`;
+  const noteHref = `/notes?tab=private&prompt=${encodeURIComponent("A little note I want to keep close...")}`;
+  const shareHref = connection?.partner_id
+    ? `/notes?tab=between_us&prompt=${encodeURIComponent("I am having a tender day and wanted to share that with you 💛")}`
+    : "/connect";
+  const directHref = connection?.partner_id
+    ? `/notes?tab=direct&prompt=${encodeURIComponent(NEED_TO_TALK_MESSAGE)}`
+    : "/connect";
+
+  const favoriteMoments = useMemo(() => {
+    const items: Array<{ id: string; kind: string; text: string; created_at: string }> = [];
+
+    for (const entry of entries.filter((item) => item.is_favorite)) {
+      items.push({ id: `journal-${entry.id}`, kind: "Journal", text: entry.text, created_at: entry.created_at });
+    }
+
+    for (const affirmation of affirmations.filter((item) => item.is_favorite)) {
+      items.push({
+        id: `affirmation-${affirmation.id}`,
+        kind: "Affirmation",
+        text: affirmation.text,
+        created_at: affirmation.created_at,
+      });
+    }
+
+    for (const note of notes.filter((item) => item.is_favorite)) {
+      items.push({ id: `note-${note.id}`, kind: "Note", text: note.text, created_at: note.created_at });
+    }
+
+    return items
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 3);
+  }, [affirmations, entries, notes]);
+
+  const resurfacedMoment = useMemo(() => {
+    const candidates = [
+      ...entries.map((entry) => ({
+        text: entry.text,
+        created_at: entry.created_at,
+        href: "/journal",
+        label: "From your journal",
+      })),
+      ...privateNotes.map((note) => ({
+        text: note.text,
+        created_at: note.created_at,
+        href: "/notes?tab=private",
+        label: "From My Space",
+      })),
+      ...moments.map((moment) => ({
+        text: moment.text,
+        created_at: moment.created_at,
+        href: "/",
+        label: "From Little Moments",
+      })),
+    ]
+      .filter((item) => {
+        const ageMs = Date.now() - new Date(item.created_at).getTime();
+        return ageMs > 86400000 && ageMs < 1000 * 60 * 60 * 24 * 10;
+      })
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    if (candidates.length === 0) return null;
+    if (Math.floor(Date.now() / 86400000) % 3 !== 0) return null;
+    return candidates[0];
+  }, [entries, moments, privateNotes]);
+
+  const waitingItem = useMemo<WaitingItem | null>(() => {
+    if (latestAlert) {
+      return {
+        id: `alert-${latestAlert.id}`,
+        kind: "alert",
+        title: "You have something waiting 💛",
+        body: "She might need you today 💛",
+        href: `/notes?tab=direct&partner=${encodeURIComponent(latestAlert.sender_id)}`,
+        onOpen: async () => {
+          await markAlertViewed(latestAlert.id);
+        },
+      };
+    }
+
+    if (latestReceivedMessage) {
+      return {
+        id: `message-${latestReceivedMessage.id}`,
+        kind: "message",
+        title: "You have something waiting 💛",
+        body: `You received a message from ${latestReceivedMessage.sender_role} 💛`,
+        href: `/notes?tab=direct&partner=${encodeURIComponent(latestReceivedMessage.sender_id)}`,
+      };
+    }
+
+    if (latestReceivedBetweenUsNote) {
+      return {
+        id: `between-${latestReceivedBetweenUsNote.id}`,
+        kind: "between_us",
+        title: "You have something waiting 💛",
+        body: `You received something from ${latestReceivedBetweenUsNote.author} 💛`,
+        href: `/notes?tab=between_us&partner=${encodeURIComponent(latestReceivedBetweenUsNote.user_id)}`,
+      };
+    }
+
+    if (latestReceivedFamilyNote) {
+      return {
+        id: `family-${latestReceivedFamilyNote.id}`,
+        kind: "family",
+        title: "You have something waiting 💛",
+        body: "There is something new in Family Space 💛",
+        href: "/notes?tab=family",
+      };
+    }
+
+    if (resurfacedMoment) {
+      return {
+        id: `memory-${resurfacedMoment.created_at}`,
+        kind: "memory",
+        title: "You have something waiting 💛",
+        body: "You wrote this recently 💛",
+        href: resurfacedMoment.href,
+      };
+    }
+
+    return null;
+  }, [
+    latestAlert,
+    latestReceivedBetweenUsNote,
+    latestReceivedFamilyNote,
+    latestReceivedMessage,
+    markAlertViewed,
+    resurfacedMoment,
+  ]);
+
+  const visibleWaitingItem = waitingItem && waitingItem.id !== dismissedWaitingId ? waitingItem : null;
+
+  const handleMoodSelect = async (mood: MoodValue) => {
+    const result = await saveCheckin(mood, shareMood && Boolean(connection?.partner_id), connection?.partner_id);
+    if (result.error) {
+      toast({
+        title: "Couldn't save your check-in",
+        description: result.error,
+      });
       return;
     }
 
-    if (trimmedMoment.length > 180) {
-      setMomentStatus("Keep it short and simple, around 180 characters or less.");
+    if (mood === "need_to_talk") {
+      navigate(directHref);
       return;
     }
+
+    if (mood === "not_great" && shareMood && connection?.partner_id) {
+      toast({
+        title: "A gentle heads-up was shared",
+        description: `${partnerLabel} will see a soft note that you may need them today.`,
+      });
+    }
+  };
+
+  const handleOpenWaiting = async () => {
+    if (!visibleWaitingItem) return;
+
+    if (visibleWaitingItem.onOpen) {
+      await visibleWaitingItem.onOpen();
+    }
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(WAITING_STORAGE_KEY, visibleWaitingItem.id);
+    }
+    setDismissedWaitingId(visibleWaitingItem.id);
+    navigate(visibleWaitingItem.href);
+  };
+
+  const handleSaveRealMoment = async () => {
+    if (!realMomentDraft.trim()) return;
 
     setIsSavingMoment(true);
-    setMomentStatus(null);
-    const wasSaved = await addMoment(trimmedMoment);
+    const success = await addMoment(realMomentDraft);
     setIsSavingMoment(false);
 
-    if (!wasSaved) {
-      setMomentStatus(momentsError ?? "That moment did not save. Please try again.");
+    if (!success) {
+      toast({
+        title: "Couldn't save that moment",
+        description: "Please try again in a moment.",
+      });
       return;
     }
 
-    setMomentDraft("");
-    setMomentStatus("Saved. That little moment is tucked away for you.");
+    setRealMomentDraft("");
+    toast({
+      title: "Saved to Little Moments",
+      description: "A small real-life memory is now tucked into your space.",
+    });
+  };
+
+  const dismissWelcome = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(WELCOME_STORAGE_KEY);
+    }
+    setShowWelcome(false);
   };
 
   return (
     <Layout>
-      <div className="section-stack pb-6">
-        <ShareMomentDialog item={shareItem} onClose={() => setShareItem(null)} />
-        {activeInboxBanner ? (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="app-card-soft flex items-center justify-between gap-3 border-primary/15 bg-primary/8 px-4 py-3"
-          >
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/75">A gentle update</p>
-              <p className="mt-1 text-sm text-foreground">{activeInboxBanner.message}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Link href={activeInboxBanner.href}>
-                <span className="cursor-pointer text-sm font-semibold text-primary">Open</span>
-              </Link>
-              <button
-                type="button"
-                onClick={() => {
-                  if (typeof window !== "undefined") {
-                    window.localStorage.setItem("between-us-last-dismissed-inbox-item", activeInboxBanner.id);
-                  }
-                  setDismissedInboxItemId(activeInboxBanner.id);
-                }}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </motion.div>
-        ) : null}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="pt-10 flex items-center gap-4"
-        >
-          <div className="relative">
-            <img
-              src={`${import.meta.env.BASE_URL}images/mom-baby-art.png`}
-              alt="Mother and child"
-              className="h-20 w-20 rounded-full border-2 border-white object-cover shadow-md"
-            />
-            <div className="absolute inset-0 rounded-full ring-2 ring-primary/30" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-primary/75">Private connection space</p>
-            <p className="mt-2 text-lg font-medium leading-tight text-foreground">
-              {greeting}, <span className="text-primary">{displayName}</span>
+      <ShareMomentDialog item={shareItem} onClose={() => setShareItem(null)} />
+
+      <div className="section-stack">
+        {showWelcome ? (
+          <section className="app-feature-card p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary/75">Welcome</p>
+            <h2 className="mt-3 text-3xl font-serif leading-tight text-foreground">This is your space.</h2>
+            <p className="mt-3 text-sm leading-7 text-foreground/88">
+              A place to be heard, supported, and close — no matter what.
             </p>
-            <h1 className="mt-1 text-[2.15rem] font-serif leading-tight tracking-[0.02em] text-foreground">{APP_NAME}</h1>
-            <p className="mt-1 text-sm font-medium text-muted-foreground">{APP_TAGLINE}</p>
-          </div>
-        </motion.div>
+            <button type="button" onClick={dismissWelcome} className="app-button-primary mt-5">
+              Enter Between Us
+            </button>
+          </section>
+        ) : null}
 
-        <motion.section
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.08 }}
-          className="app-feature-card p-6"
-        >
-          <div className="relative z-10">
-            <div className="flex items-center justify-between gap-3">
-              <span className="app-mini-pill">Today together</span>
-              <span className="text-xs font-medium text-muted-foreground">{todayLabel}</span>
-            </div>
+        <section className="app-card-soft p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary/75">{APP_NAME}</p>
+          <h1 className="mt-3 text-3xl font-serif leading-tight text-foreground">
+            {greeting}, {firstName}
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{APP_TAGLINE}</p>
+          <p className="mt-4 text-sm leading-6 text-foreground/88">
+            A gentle place for private thoughts, shared notes, and quiet connection that stays intentional.
+          </p>
+        </section>
 
-            <div className="mt-5 flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary">
-                <HeartHandshake className="h-6 w-6" />
+        <MoodCard
+          todayCheckin={todayCheckin}
+          shareMood={shareMood}
+          onToggleShareMood={setShareMood}
+          onSelectMood={(mood) => void handleMoodSelect(mood)}
+          isSaving={isSaving}
+          canShareMood={Boolean(connection?.partner_id)}
+          activePartnerLabel={activePartnerLabel}
+          dailyAffirmation={dailyAffirmation.text}
+          journalHref={journalHref}
+          noteHref={noteHref}
+          shareHref={shareHref}
+          directHref={directHref}
+        />
+
+        {visibleWaitingItem ? (
+          <button
+            type="button"
+            onClick={() => void handleOpenWaiting()}
+            className="app-card flex w-full items-center justify-between gap-4 border-primary/15 bg-primary/8 p-4 text-left transition-all duration-200 hover:-translate-y-0.5"
+          >
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-full bg-white/80 p-2 text-primary shadow-sm">
+                <Bell className="h-4 w-4" />
               </div>
               <div>
-                <h2 className="text-2xl font-serif leading-tight text-foreground">{ritual.title}</h2>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">{ritual.body}</p>
+                <p className="text-sm font-semibold text-foreground">{visibleWaitingItem.title}</p>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">{visibleWaitingItem.body}</p>
               </div>
             </div>
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Open</span>
+          </button>
+        ) : null}
 
-            <div className="mt-5 flex flex-wrap gap-2">
-              {ritual.actions.map((action) => (
-                <Link key={action.href} href={action.href}>
-                  <span className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-primary/12 bg-white/84 px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-white">
-                    <SunMedium className="h-4 w-4 text-primary" />
-                    {action.label}
-                  </span>
-                </Link>
-              ))}
+        {resurfacedMoment && (!visibleWaitingItem || visibleWaitingItem.kind !== "memory") ? (
+          <section className="app-card p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">Memory Resurfacing</p>
+            <h2 className="mt-2 text-xl font-serif text-foreground">You wrote this recently 💛</h2>
+            <p className="mt-3 text-sm leading-6 text-foreground">{resurfacedMoment.text}</p>
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground">{resurfacedMoment.label}</p>
+              <Link href={resurfacedMoment.href} className="text-sm font-semibold text-primary">
+                Visit it
+              </Link>
+            </div>
+          </section>
+        ) : null}
+
+        <section className="grid gap-4 md:grid-cols-2">
+          <div className="app-card p-5">
+            <div className="flex items-center gap-2 text-primary">
+              <Sparkles className="h-4 w-4" />
+              <p className="text-xs font-semibold uppercase tracking-[0.18em]">Daily Affirmation</p>
+            </div>
+            <p className="mt-3 text-lg font-serif leading-snug text-foreground">{dailyAffirmation.text}</p>
+            <Link href="/affirmations" className="mt-4 inline-flex text-sm font-semibold text-primary">
+              Generate another affirmation
+            </Link>
+          </div>
+
+          <div className="app-card p-5">
+            <div className="flex items-center gap-2 text-primary">
+              <BookHeart className="h-4 w-4" />
+              <p className="text-xs font-semibold uppercase tracking-[0.18em]">Daily Connection Prompt</p>
+            </div>
+            <p className="mt-3 text-lg font-serif leading-snug text-foreground">{dailyPrompt}</p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link href={`/journal?prompt=${encodeURIComponent(dailyPrompt)}`} className="app-button-secondary">
+                Reflect in Journal
+              </Link>
+              <Link href={`/notes?tab=between_us&prompt=${encodeURIComponent(dailyPrompt)}`} className="app-button-secondary">
+                Turn into a Note
+              </Link>
             </div>
           </div>
-        </motion.section>
+        </section>
 
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-        >
-          <Link href="/affirmations">
-            <div className="group relative cursor-pointer overflow-hidden rounded-[1.9rem] bg-gradient-to-br from-primary to-primary/80 p-7 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-              <div className="pointer-events-none absolute right-0 top-0 h-32 w-32 translate-x-8 -translate-y-8 rounded-full bg-white/10" />
-              <div className="pointer-events-none absolute bottom-0 left-0 h-24 w-24 -translate-x-4 translate-y-8 rounded-full bg-white/8" />
-              <div className="relative z-10">
-                <div className="mb-3 flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-white/80" />
-                  <span className="text-xs font-medium uppercase tracking-widest text-white/80">Daily Affirmation</span>
-                </div>
-                <p className="text-xl font-serif leading-snug text-white">"{affirmation.text}"</p>
-                <p className="mt-3 inline-flex rounded-full bg-white/14 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">
-                  {affirmation.theme}
-                </p>
-                <div className="mt-4 flex items-center gap-1 text-xs text-white/70 transition-colors group-hover:text-white/90">
-                  <span>See more</span>
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </div>
-              </div>
-            </div>
-          </Link>
-        </motion.div>
-
-        <motion.section
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.16 }}
-          className="app-card p-5"
-        >
+        <section className="app-card p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Shared Snapshot</p>
-              <h2 className="mt-2 text-2xl font-serif text-foreground">Your space in bloom</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">Shared Snapshot</p>
+              <h2 className="mt-2 text-xl font-serif text-foreground">A gentle view of your space</h2>
             </div>
-            <div className="rounded-2xl bg-primary/10 px-4 py-3 text-right">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">Moments kept</p>
-              <p className="mt-1 text-2xl font-serif text-primary">{totalMoments}</p>
-            </div>
+            <Users className="h-5 w-5 text-primary/70" />
           </div>
-
           <div className="mt-4 grid grid-cols-3 gap-3">
-            <div className="app-stat-tile">
-              <NotebookPen className="h-4 w-4 text-primary" />
-              <p className="mt-3 text-2xl font-serif text-foreground">{entries.length}</p>
+            <div className="rounded-[1.2rem] bg-muted/35 px-4 py-4 text-center">
+              <p className="text-2xl font-serif text-foreground">{entries.length}</p>
               <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">Journal</p>
             </div>
-            <div className="app-stat-tile">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <p className="mt-3 text-2xl font-serif text-foreground">{affirmations.length}</p>
-              <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">Affirmations</p>
+            <div className="rounded-[1.2rem] bg-muted/35 px-4 py-4 text-center">
+              <p className="text-2xl font-serif text-foreground">{betweenUsNotes.length + familyNotes.length}</p>
+              <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">Shared</p>
             </div>
-            <div className="app-stat-tile">
-              <MessagesSquare className="h-4 w-4 text-primary" />
-              <p className="mt-3 text-2xl font-serif text-foreground">{privateNotes.length + sharedNotes.length}</p>
-              <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">Notes</p>
+            <div className="rounded-[1.2rem] bg-muted/35 px-4 py-4 text-center">
+              <p className="text-2xl font-serif text-foreground">{moments.length}</p>
+              <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">Moments</p>
             </div>
           </div>
+        </section>
 
-          <div className="mt-4 rounded-[1.35rem] border border-border/70 bg-muted/28 px-4 py-3">
-            {!allMomentsLoaded ? (
-              <p className="text-sm text-muted-foreground">Gathering your latest moments...</p>
-            ) : latestMoment ? (
-              <p className="text-sm text-muted-foreground">
-                Latest moment: <span className="font-semibold text-foreground">{latestMoment.label}</span>{" "}
-                {formatFriendlyTimestamp(latestMoment.created_at)}
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Your first saved moment will show up here and make this space feel even more yours.
-              </p>
-            )}
+        <section className="app-card p-5">
+          <div className="flex items-center gap-2 text-primary">
+            <MessageCircleHeart className="h-4 w-4" />
+            <p className="text-xs font-semibold uppercase tracking-[0.18em]">Little Moments</p>
           </div>
-        </motion.section>
-
-        <motion.section
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.2 }}
-          className="app-feature-card p-5"
-        >
-          <div className="relative z-10">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Daily Connection Prompt</p>
-                <h2 className="mt-2 text-2xl font-serif text-foreground">A little question to bring you closer</h2>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/80 text-primary shadow-sm">
-                <HeartHandshake className="h-5 w-5" />
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-[1.45rem] border border-white/75 bg-white/84 p-5 shadow-sm">
-              <p className="text-lg font-serif leading-relaxed text-foreground">"{connectionPrompt}"</p>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                Answer it in your journal, or send it as a note to keep the conversation going.
-              </p>
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <Link href={`/journal?prompt=${encodeURIComponent(connectionPrompt)}`}>
-                <div className="flex cursor-pointer items-center justify-center gap-2 rounded-[1.35rem] border border-primary/15 bg-white/82 px-4 py-3 text-sm font-semibold text-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-white">
-                  <PenSquare className="h-4 w-4 text-primary" />
-                  Reflect in Journal
-                </div>
-              </Link>
-              <Link href={`/notes?prompt=${encodeURIComponent(connectionPrompt)}`}>
-                <div className="flex cursor-pointer items-center justify-center gap-2 rounded-[1.35rem] border border-primary/15 bg-white/82 px-4 py-3 text-sm font-semibold text-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-white">
-                  <Send className="h-4 w-4 text-primary" />
-                  Turn into a Note
-                </div>
-              </Link>
-            </div>
-          </div>
-        </motion.section>
-
-        <motion.section
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.24 }}
-          className="app-feature-card p-5"
-        >
-          <div className="relative z-10">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Real Moments</p>
-                <h2 className="mt-2 text-2xl font-serif text-foreground">The little things that feel very us</h2>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/80 text-primary shadow-sm">
-                <Laugh className="h-5 w-5" />
-              </div>
-            </div>
-
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Keep one short, private moment from real life. The eye roll, the hug, the laugh ten minutes later.
-            </p>
-
-            <div className="mt-4 rounded-[1.45rem] border border-white/75 bg-white/84 p-4 shadow-sm">
-              <textarea
-                value={momentDraft}
-                onChange={(event) => setMomentDraft(event.target.value)}
-                maxLength={180}
-                rows={3}
-                placeholder='Like: "She rolled her eyes at me but still hugged me goodnight."'
-                className="min-h-24 w-full resize-none rounded-[1.15rem] border border-border/70 bg-background/80 px-4 py-3 text-sm leading-6 text-foreground outline-none transition focus:border-primary/35 focus:ring-2 focus:ring-primary/15"
-              />
-
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <p className="text-xs text-muted-foreground">{momentDraft.trim().length}/180 characters</p>
-                <button
-                  type="button"
-                  onClick={saveMoment}
-                  disabled={isSavingMoment}
-                  className="app-button app-button-primary px-5 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {isSavingMoment ? "Saving..." : "Save moment"}
-                </button>
-              </div>
-
-              {momentStatus ? <p className="mt-3 text-sm text-muted-foreground">{momentStatus}</p> : null}
-              {!momentStatus && momentsError ? <p className="mt-3 text-sm text-destructive">{momentsError}</p> : null}
-            </div>
-
-            <div className="mt-4 grid gap-3">
-              {!momentsLoaded ? (
-                <div className="rounded-[1.35rem] border border-white/70 bg-white/76 px-4 py-4">
-                  <p className="text-sm text-muted-foreground">Loading your little moments...</p>
-                </div>
-              ) : recentMoments.length === 0 ? (
-                <div className="rounded-[1.35rem] border border-white/70 bg-white/76 px-4 py-4">
-                  <p className="text-sm text-muted-foreground">
-                    No little moments yet. Save one tiny true story and it will live here.
-                  </p>
-                </div>
-              ) : (
-                recentMoments.map((moment) => (
-                  <div
-                    key={moment.id}
-                    className="rounded-[1.35rem] border border-white/75 bg-white/80 px-4 py-4 shadow-sm"
-                  >
-                    <p className="text-sm leading-6 text-foreground">"{moment.text}"</p>
-                    <div className="mt-3 flex items-center justify-between gap-3">
-                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                        {formatFriendlyTimestamp(moment.created_at)}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setShareItem({
-                            label: "Real Moment",
-                            text: moment.text,
-                            tagline: SHARE_CARD_TAGLINE,
-                          })
-                        }
-                        className="rounded-full border border-white/70 bg-white px-3 py-1.5 text-[11px] font-semibold text-muted-foreground shadow-sm transition-all duration-200 hover:text-primary"
-                      >
-                        <span className="inline-flex items-center gap-1.5">
-                          <Share2 className="h-3 w-3" />
-                          Share 💛
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </motion.section>
-
-        <motion.section
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.28 }}
-          className="app-card p-5"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Favorite Moments</p>
-              <h2 className="mt-2 text-2xl font-serif text-foreground">The ones you want to keep close</h2>
-            </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <Heart className="h-5 w-5 fill-current" />
-            </div>
-          </div>
-
-          {!allMomentsLoaded ? (
-            <div className="mt-4 rounded-[1.35rem] border border-border/70 bg-muted/28 px-4 py-4">
-              <p className="text-sm text-muted-foreground">Gathering your favorite moments...</p>
-            </div>
-          ) : favoriteMoments.length === 0 ? (
-            <div className="mt-4 rounded-[1.35rem] border border-border/70 bg-muted/28 px-4 py-4">
-              <p className="text-sm text-muted-foreground">
-                Tap the little heart on a journal entry, affirmation, or note to keep your most treasured moments here.
-              </p>
-            </div>
-          ) : (
-            <div className="mt-4 grid gap-3">
-              {favoriteMoments.map((moment) => (
-                <Link key={moment.id} href={moment.href}>
-                  <div className="group cursor-pointer rounded-[1.45rem] border border-border/70 bg-white/84 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
-                        <Heart className="h-3.5 w-3.5 fill-current" />
-                        {moment.type}
-                      </span>
-                      <span className="text-xs text-muted-foreground">{formatFriendlyTimestamp(moment.created_at)}</span>
-                    </div>
-                    <p className="mt-3 line-clamp-2 text-sm leading-6 text-foreground">{moment.text}</p>
-                    <p className="mt-3 text-xs uppercase tracking-[0.16em] text-muted-foreground">{moment.meta}</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </motion.section>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-        >
-          <p className="px-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Our Spaces</p>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.34 }}
-          className="flex flex-col gap-3"
-        >
-          {QUICK_LINKS.map(({ href, icon: Icon, label, description, color, activeBg }, i) => (
-            <motion.div
-              key={href}
-              initial={{ opacity: 0, x: -12 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 + i * 0.08 }}
-            >
-              <Link href={href}>
-                <div className={`app-card-soft group flex cursor-pointer items-center gap-4 p-5 ${activeBg} transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg`}>
-                  <div className={`h-12 w-12 flex-shrink-0 rounded-xl ${color} flex items-center justify-center`}>
-                    <Icon className="h-6 w-6" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-base font-semibold leading-tight text-foreground">{label}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
-                </div>
-              </Link>
-            </motion.div>
-          ))}
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.7 }}
-          className="app-card p-6"
-        >
-          <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Words of Wisdom</p>
-          <p className="mb-3 text-base font-serif italic leading-relaxed text-foreground">
-            "{QUOTES[quoteIndex].text}"
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Short, real-life pieces of the day. Slightly funny. Slightly tender. Fully yours.
           </p>
-          <p className="text-sm font-semibold text-primary">- {QUOTES[quoteIndex].author}</p>
-          <div className="mt-4 flex items-center justify-between">
-            <button onClick={prevQuote} className="app-icon-button h-10 w-10 rounded-full border-transparent bg-muted/70 hover:bg-white">
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <div className="flex gap-1.5">
-              {QUOTES.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setQuoteIndex(i)}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    i === quoteIndex ? "w-5 bg-primary" : "w-1.5 bg-muted-foreground/30"
-                  }`}
-                />
-              ))}
-            </div>
-            <button onClick={nextQuote} className="app-icon-button h-10 w-10 rounded-full border-transparent bg-muted/70 hover:bg-white">
-              <ChevronRight className="h-4 w-4" />
+          <textarea
+            value={realMomentDraft}
+            onChange={(event) => setRealMomentDraft(event.target.value)}
+            maxLength={180}
+            placeholder="She rolled her eyes at me, then brought me a snack anyway."
+            className="mt-4 min-h-[90px] w-full resize-none rounded-2xl bg-muted/30 p-4 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+          />
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">{realMomentDraft.length}/180</p>
+            <button
+              type="button"
+              onClick={() => void handleSaveRealMoment()}
+              disabled={!realMomentDraft.trim() || isSavingMoment}
+              className="app-button-primary disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isSavingMoment ? "Saving..." : "Save moment"}
             </button>
           </div>
-        </motion.div>
+
+          {moments.length > 0 ? (
+            <div className="mt-4 space-y-3">
+              {moments.slice(0, 3).map((moment) => (
+                <div key={moment.id} className="rounded-[1.2rem] border border-border/70 bg-white/80 px-4 py-4">
+                  <p className="text-sm leading-6 text-foreground">{moment.text}</p>
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <p className="text-xs text-muted-foreground">{formatFriendlyTimestamp(moment.created_at)}</p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShareItem({
+                          label: "Little Moment",
+                          text: moment.text,
+                          tagline: SHARE_CARD_TAGLINE,
+                        })
+                      }
+                      className="text-sm font-semibold text-primary"
+                    >
+                      Share 💛
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>
+
+        {favoriteMoments.length > 0 ? (
+          <section className="app-card p-5">
+            <div className="flex items-center gap-2 text-primary">
+              <Star className="h-4 w-4" />
+              <p className="text-xs font-semibold uppercase tracking-[0.18em]">Favorite Moments</p>
+            </div>
+            <div className="mt-4 space-y-3">
+              {favoriteMoments.map((moment) => (
+                <div key={moment.id} className="rounded-[1.2rem] border border-border/70 bg-white/80 px-4 py-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/75">{moment.kind}</p>
+                  <p className="mt-2 text-sm leading-6 text-foreground">{moment.text}</p>
+                  <p className="mt-3 text-xs text-muted-foreground">{formatFriendlyTimestamp(moment.created_at)}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="grid gap-3 md:grid-cols-3">
+          <Link href="/journal" className="app-card-soft p-4">
+            <p className="text-sm font-semibold text-foreground">Journal</p>
+            <p className="mt-1 text-sm text-muted-foreground">Write it out softly.</p>
+          </Link>
+          <Link href="/notes" className="app-card-soft p-4">
+            <p className="text-sm font-semibold text-foreground">Notes</p>
+            <p className="mt-1 text-sm text-muted-foreground">Choose My Space, Between Us, or Direct Messages.</p>
+          </Link>
+          <Link href="/settings" className="app-card-soft p-4">
+            <p className="text-sm font-semibold text-foreground">Settings</p>
+            <p className="mt-1 text-sm text-muted-foreground">Manage connection and account care.</p>
+          </Link>
+        </section>
       </div>
     </Layout>
   );
 }
-
-

@@ -60,9 +60,15 @@ export function Layout({ children, title, subtitle }: LayoutProps) {
         </header>
       )}
 
-      <main className="flex-1 w-full max-w-lg px-6 pt-4 pb-28 z-10 relative flex flex-col">
+      <motion.main
+        key={location}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: "easeOut" }}
+        className="flex-1 w-full max-w-lg px-6 pt-4 pb-28 z-10 relative flex flex-col"
+      >
         {children}
-      </main>
+      </motion.main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none">
         <div className="w-full max-w-lg px-4 pb-5 pointer-events-auto">

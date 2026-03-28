@@ -159,7 +159,7 @@ export default function Journal() {
             >
               <Flower className="h-8 w-8 text-muted-foreground/40" />
               <p className="text-lg font-serif italic text-muted-foreground">
-                No journal entries yet. Start writing your first one.
+                Nothing written yet, but your heart has room here whenever you're ready.
               </p>
             </motion.div>
           ) : (

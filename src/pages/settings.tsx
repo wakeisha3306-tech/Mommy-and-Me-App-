@@ -10,7 +10,7 @@ import { formatFriendlyTimestamp, getUserLabel } from "@/lib/utils";
 
 export default function SettingsPage() {
   const { session, profile, signOut, updatePassword, updateEmail, sendPasswordReset } = useAuth();
-  const { connection, partnerRole } = useConnection();
+  const { connections, partnerRole } = useConnection();
   const userLabel = getUserLabel(profile?.display_name, session?.user.email);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -28,6 +28,14 @@ export default function SettingsPage() {
   const passwordLastUpdated = profile?.password_updated_at
     ? formatFriendlyTimestamp(profile.password_updated_at)
     : null;
+  const connectionSummary =
+    profile?.role === "Mom"
+      ? connections.length > 0
+        ? `${connections.length} connected daughter${connections.length === 1 ? "" : "s"}`
+        : "No daughters connected yet"
+      : connections.length > 0
+        ? `Connected to: ${partnerRole}`
+        : "Not connected yet";
 
   const handlePasswordSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -117,6 +125,9 @@ export default function SettingsPage() {
               <p className="mt-2 text-sm text-muted-foreground">
                 Your private space is connected to this account and only visible to you.
               </p>
+              <p className="mt-3 text-xs font-semibold tracking-[0.08em] text-primary/75">
+                Everything you share here is private and protected.
+              </p>
             </div>
           </div>
 
@@ -173,14 +184,12 @@ export default function SettingsPage() {
                     <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
                       Connection
                     </p>
-                    <p className="mt-1 truncate text-sm font-medium text-foreground">
-                      {connection ? `Connected to: ${partnerRole}` : "Not connected yet"}
-                    </p>
+                    <p className="mt-1 truncate text-sm font-medium text-foreground">{connectionSummary}</p>
                   </div>
                 </div>
                 <Link href="/connect">
                   <span className="cursor-pointer text-sm font-semibold text-primary">
-                    {connection ? "Manage" : "Connect"}
+                    {connections.length > 0 ? "Manage" : "Connect"}
                   </span>
                 </Link>
               </div>

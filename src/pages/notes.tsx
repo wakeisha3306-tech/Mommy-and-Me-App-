@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Flower, Heart, Link2, Lock, MessageCircleHeart, Send, Share2, Trash2, Users } from "lucide-react";
+import {
+  Flower,
+  Heart,
+  Link2,
+  Lock,
+  MessageCircleHeart,
+  Send,
+  Share2,
+  Trash2,
+  Users,
+  Home,
+} from "lucide-react";
 import { Layout } from "@/components/layout";
 import { ContentState } from "@/components/content-state";
 import { ShareMomentDialog } from "@/components/share-moment-dialog";
@@ -11,9 +22,9 @@ import { useNotes, type Note, type NoteSpace } from "@/hooks/use-notes";
 import { toast } from "@/hooks/use-toast";
 import { SHARE_CARD_TAGLINE } from "@/lib/brand";
 import type { ShareCardContent } from "@/lib/share-card";
-import { formatFriendlyTimestamp } from "@/lib/utils";
+import { formatFriendlyTimestamp, getUserLabel } from "@/lib/utils";
 
-type NotesTab = "private" | "shared" | "direct";
+type NotesTab = "private" | "between_us" | "family" | "direct";
 
 const TAB_CONFIG: Record<NotesTab, { label: string; description: string; icon: typeof Lock }> = {
   private: {
@@ -21,14 +32,19 @@ const TAB_CONFIG: Record<NotesTab, { label: string; description: string; icon: t
     description: "Private notes only you can see",
     icon: Lock,
   },
-  shared: {
+  between_us: {
     label: "Between Us",
-    description: "Shared notes for the two of you",
+    description: "One-to-one space with one connection",
     icon: Users,
+  },
+  family: {
+    label: "Family Space",
+    description: "Shared intentionally with Mom and linked daughters",
+    icon: Home,
   },
   direct: {
     label: "Direct Messages",
-    description: "Intentional messages between you both",
+    description: "Soft one-to-one messages",
     icon: MessageCircleHeart,
   },
 };
@@ -39,10 +55,16 @@ const PRIVATE_PROMPTS = [
   "A quiet feeling I want to hold onto...",
 ];
 
-const SHARED_PROMPTS = [
-  "Something I want us to carry together...",
-  "A note I want to leave between us...",
-  "A little truth I want to share with you...",
+const BETWEEN_US_PROMPTS = [
+  "Something I want us to hold together...",
+  "A note meant just for one of us...",
+  "A little truth for this relationship...",
+];
+
+const FAMILY_PROMPTS = [
+  "Something I want the whole family space to hear...",
+  "A family note I want us all to carry...",
+  "A loving reminder for all of us...",
 ];
 
 const DIRECT_PROMPTS = [
@@ -73,6 +95,9 @@ function EmptyState({ title, body }: { title: string; body: string }) {
 function NotesList({
   notes,
   currentUserId,
+  currentUserRole,
+  activePartnerLabel,
+  canUseFamilySpace,
   onShare,
   onToggleFavorite,
   onDelete,
@@ -80,6 +105,9 @@ function NotesList({
 }: {
   notes: Note[];
   currentUserId?: string;
+  currentUserRole?: "Mom" | "Daughter" | null;
+  activePartnerLabel: string | null;
+  canUseFamilySpace: boolean;
   onShare: (item: ShareCardContent) => void;
   onToggleFavorite: (id: string, isFavorite: boolean) => void;
   onDelete: (id: string) => void;
@@ -94,7 +122,16 @@ function NotesList({
       <AnimatePresence>
         {notes.map((note) => {
           const isOwn = note.user_id === currentUserId;
-          const spaceLabel = note.is_shared ? (isOwn ? "Shared by you" : "Shared with you") : "Private to you";
+          const spaceLabel =
+            note.visibility === "private"
+              ? "Private to you"
+              : note.visibility === "family"
+                ? isOwn
+                  ? "Shared with family"
+                  : "Shared in family space"
+                : isOwn
+                  ? "Shared by you"
+                  : "Shared with you";
 
           return (
             <motion.div
@@ -121,7 +158,12 @@ function NotesList({
                   <button
                     onClick={() =>
                       onShare({
-                        label: note.is_shared ? "Between Us" : "My Space",
+                        label:
+                          note.visibility === "family"
+                            ? "Family Space"
+                            : note.visibility === "between_us"
+                              ? "Between Us"
+                              : "My Space",
                         text: note.text,
                         tagline: SHARE_CARD_TAGLINE,
                       })
@@ -145,14 +187,38 @@ function NotesList({
                     </button>
                   ) : null}
 
-                  {isOwn ? (
+                  {isOwn && note.visibility === "private" && activePartnerLabel ? (
                     <button
-                      onClick={() => onMove(note.id, note.is_shared ? "private" : "shared")}
+                      onClick={() => onMove(note.id, "between_us")}
                       className="rounded-xl px-2.5 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-primary/8 hover:text-primary"
                     >
                       <span className="inline-flex items-center gap-1.5">
                         <Link2 className="h-3.5 w-3.5" />
-                        {note.is_shared ? "Keep private" : "Share with partner"}
+                        Share with {activePartnerLabel}
+                      </span>
+                    </button>
+                  ) : null}
+
+                  {isOwn && note.visibility === "private" && canUseFamilySpace ? (
+                    <button
+                      onClick={() => onMove(note.id, "family")}
+                      className="rounded-xl px-2.5 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-primary/8 hover:text-primary"
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5" />
+                        Share with family
+                      </span>
+                    </button>
+                  ) : null}
+
+                  {isOwn && note.visibility !== "private" ? (
+                    <button
+                      onClick={() => onMove(note.id, "private")}
+                      className="rounded-xl px-2.5 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-primary/8 hover:text-primary"
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        <Lock className="h-3.5 w-3.5" />
+                        Keep private
                       </span>
                     </button>
                   ) : null}
@@ -177,11 +243,12 @@ function NotesList({
 
 export default function Notes() {
   const { session, profile } = useAuth();
-  const { connection, partnerRole } = useConnection();
+  const { connection, connections, partnerRole, setSelectedPartnerId } = useConnection();
   const {
     privateNotes,
-    sharedNotes,
-    receivedSharedNotes,
+    betweenUsNotes,
+    familyNotes,
+    receivedBetweenUsNotes,
     isLoaded: notesLoaded,
     error: notesError,
     addNote,
@@ -189,12 +256,7 @@ export default function Notes() {
     toggleFavorite,
     moveNoteToSpace,
   } = useNotes();
-  const {
-    messages,
-    isLoaded: messagesLoaded,
-    error: messagesError,
-    sendMessage,
-  } = useDirectMessages();
+  const { messages, isLoaded: messagesLoaded, error: messagesError, sendMessage } = useDirectMessages();
 
   const promptFromQuery = useMemo(() => {
     if (typeof window === "undefined") return "";
@@ -203,7 +265,11 @@ export default function Notes() {
   const tabFromQuery = useMemo(() => {
     if (typeof window === "undefined") return "private";
     const nextTab = new URLSearchParams(window.location.search).get("tab");
-    return nextTab === "shared" || nextTab === "direct" ? nextTab : "private";
+    return nextTab === "between_us" || nextTab === "family" || nextTab === "direct" ? nextTab : "private";
+  }, []);
+  const partnerFromQuery = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("partner")?.trim() ?? "";
   }, []);
 
   const [activeTab, setActiveTab] = useState<NotesTab>(tabFromQuery);
@@ -212,22 +278,36 @@ export default function Notes() {
 
   useEffect(() => {
     if (!promptFromQuery) return;
-    setDraft((current) => (current.trim() ? current : `${promptFromQuery}\n\n`));
-  }, [promptFromQuery]);
+    setDraft((current) => (current.trim() ? current : activeTab === "direct" ? promptFromQuery : `${promptFromQuery}\n\n`));
+  }, [activeTab, promptFromQuery]);
 
-  const connected = Boolean(connection?.partner_id);
-  const sharedFeed = sharedNotes;
+  useEffect(() => {
+    if (!partnerFromQuery) return;
+    const matchingConnection = connections.find((entry) => entry.partner_id === partnerFromQuery);
+    if (matchingConnection) {
+      setSelectedPartnerId(matchingConnection.partner_id);
+    }
+  }, [connections, partnerFromQuery, setSelectedPartnerId]);
+
+  const activePartnerLabel = useMemo(
+    () => getUserLabel(connection?.partner_name, connection?.partner_email ?? undefined),
+    [connection?.partner_email, connection?.partner_name],
+  );
+  const canUseBetweenUs = Boolean(connection?.partner_id);
+  const canUseFamilySpace = connections.length > 0;
   const directFeed = useMemo(
     () => [...messages].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
     [messages],
   );
-  const currentTab = TAB_CONFIG[activeTab];
+
   const currentPlaceholder =
     activeTab === "private"
       ? PRIVATE_PROMPTS[0]
-      : activeTab === "shared"
-        ? SHARED_PROMPTS[0]
-        : DIRECT_PROMPTS[0];
+      : activeTab === "between_us"
+        ? BETWEEN_US_PROMPTS[0]
+        : activeTab === "family"
+          ? FAMILY_PROMPTS[0]
+          : DIRECT_PROMPTS[0];
 
   const handleCreate = async () => {
     if (!draft.trim()) return;
@@ -245,7 +325,7 @@ export default function Notes() {
       setDraft("");
       toast({
         title: "Message sent",
-        description: "Your message was sent privately.",
+        description: `Your message was sent privately${activePartnerLabel ? ` to ${activePartnerLabel}` : ""}.`,
       });
       return;
     }
@@ -261,21 +341,25 @@ export default function Notes() {
 
     setDraft("");
     toast({
-      title: activeTab === "private" ? "Saved to My Space" : "Saved to Between Us",
+      title:
+        activeTab === "private"
+          ? "Saved to My Space"
+          : activeTab === "between_us"
+            ? "Saved to Between Us"
+            : "Saved to Family Space",
       description:
         activeTab === "private"
           ? "Only you can see this note."
-          : "This note is now visible to your connected partner too.",
+          : activeTab === "between_us"
+            ? `Only you and ${activePartnerLabel ?? partnerRole ?? "your connection"} can see this note.`
+            : "This note is now visible inside Family Space only.",
     });
   };
 
   const notesErrorMessage = notesError ?? messagesError;
-  const directEmptyText = connected
-    ? "No direct messages yet."
-    : "Connect your accounts first to send private messages.";
 
   return (
-    <Layout title="Notes" subtitle="Private thoughts, shared notes, and messages that stay intentional">
+    <Layout title="Notes" subtitle="Private, one-to-one, and family spaces that stay intentional">
       <div className="mt-3 section-stack">
         <ShareMomentDialog item={shareItem} onClose={() => setShareItem(null)} />
 
@@ -287,7 +371,7 @@ export default function Notes() {
 
         <section className="app-card overflow-hidden">
           <div className="border-b border-border/80 px-4 py-4">
-            <div className="grid grid-cols-3 gap-2 rounded-[1.3rem] bg-muted/45 p-1">
+            <div className="grid grid-cols-2 gap-2 rounded-[1.3rem] bg-muted/45 p-1 md:grid-cols-4">
               {(Object.keys(TAB_CONFIG) as NotesTab[]).map((tab) => {
                 const tabMeta = TAB_CONFIG[tab];
                 const Icon = tabMeta.icon;
@@ -314,17 +398,50 @@ export default function Notes() {
           </div>
 
           <div className="p-5">
+            {(activeTab === "between_us" || activeTab === "direct") && connections.length > 1 ? (
+              <div className="mb-4 rounded-[1.2rem] border border-border/80 bg-muted/25 px-4 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Choose your daughter space</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {connections.map((entry) => {
+                    const label = getUserLabel(entry.partner_name, entry.partner_email ?? undefined);
+                    const active = entry.partner_id === connection?.partner_id;
+
+                    return (
+                      <button
+                        key={entry.partner_id}
+                        type="button"
+                        onClick={() => setSelectedPartnerId(entry.partner_id)}
+                        className={`rounded-full px-4 py-2 text-sm font-semibold transition-all ${
+                          active ? "bg-primary text-white shadow-sm" : "bg-white text-foreground shadow-sm hover:-translate-y-0.5"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
             <div className="rounded-[1.2rem] border border-primary/10 bg-primary/6 px-4 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/75">
-                {activeTab === "private" ? "My Space" : activeTab === "shared" ? "Between Us" : "Direct Messages"}
+                {activeTab === "private"
+                  ? "My Space"
+                  : activeTab === "between_us"
+                    ? "Between Us"
+                    : activeTab === "family"
+                      ? "Family Space"
+                      : "Direct Messages"}
               </p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {activeTab === "private" &&
-                  "These notes stay private to you. Nothing here is visible to your connected partner unless you choose to move it into Between Us."}
-                {activeTab === "shared" &&
-                  "Anything written here is intentionally shared with your connected partner. It shows up for both of you and stays out of My Space."}
+                  "These notes stay private to you. Nothing here becomes visible to anyone else unless you choose a different space."}
+                {activeTab === "between_us" &&
+                  `This space is only for you and ${activePartnerLabel ?? partnerRole ?? "your connection"}. One daughter never sees another daughter's Between Us notes.`}
+                {activeTab === "family" &&
+                  "Family Space is shared intentionally with Mom and all connected daughters. It stays separate from one-to-one spaces."}
                 {activeTab === "direct" &&
-                  "Messages here are private between sender and recipient only. They are not public and they do not appear in shared notes."}
+                  `Messages here are private between sender and recipient only. They stay just between you and ${activePartnerLabel ?? partnerRole ?? "your connection"}.`}
               </p>
               <p className="mt-2 text-xs font-medium text-foreground">Writing as {profile?.role ?? "your profile"}</p>
             </div>
@@ -341,24 +458,42 @@ export default function Notes() {
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 placeholder={currentPlaceholder}
-                disabled={activeTab === "direct" && !connected}
+                disabled={(activeTab === "between_us" || activeTab === "direct") && !canUseBetweenUs}
                 className="min-h-[110px] w-full resize-none rounded-2xl bg-muted/30 p-4 text-base text-foreground placeholder:text-muted-foreground transition-shadow focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
               />
 
               <div className="mt-4 flex items-center justify-between gap-3">
                 <p className="text-xs text-muted-foreground">
                   {activeTab === "private" && "Visible only to you"}
-                  {activeTab === "shared" && (connected ? `Visible to you and ${partnerRole}` : "Connect first to share notes")}
-                  {activeTab === "direct" && (connected ? `Sent privately to ${partnerRole}` : "Connect first to send direct messages")}
+                  {activeTab === "between_us" &&
+                    (canUseBetweenUs
+                      ? `Visible only to you and ${activePartnerLabel ?? partnerRole}`
+                      : "Choose or create a connection first")}
+                  {activeTab === "family" &&
+                    (canUseFamilySpace ? "Visible in Family Space only" : "Connect family members first")}
+                  {activeTab === "direct" &&
+                    (canUseBetweenUs
+                      ? `Sent privately to ${activePartnerLabel ?? partnerRole}`
+                      : "Choose or create a connection first")}
                 </p>
                 <button
                   type="button"
                   onClick={() => void handleCreate()}
-                  disabled={!draft.trim() || ((activeTab === "shared" || activeTab === "direct") && !connected)}
+                  disabled={
+                    !draft.trim() ||
+                    ((activeTab === "between_us" || activeTab === "direct") && !canUseBetweenUs) ||
+                    (activeTab === "family" && !canUseFamilySpace)
+                  }
                   className="app-button-primary flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Send className="h-4 w-4" />
-                  {activeTab === "direct" ? "Send message" : activeTab === "shared" ? "Share note" : "Save note"}
+                  {activeTab === "direct"
+                    ? "Send message"
+                    : activeTab === "between_us"
+                      ? "Share one-to-one"
+                      : activeTab === "family"
+                        ? "Share with family"
+                        : "Save note"}
                 </button>
               </div>
             </div>
@@ -372,55 +507,78 @@ export default function Notes() {
                 <ContentState message="Loading My Space..." loading />
               ) : privateNotes.length === 0 ? (
                 <EmptyState
-                  title="No private notes yet."
-                  body="This space is only for you. Save a thought here when you want to keep it close before sharing anything."
+                  title="Your private space is still quiet."
+                  body="Keep a thought here when you want somewhere gentle to land before sharing anything at all."
                 />
               ) : (
                 <NotesList
                   notes={privateNotes}
                   currentUserId={session?.user.id}
+                  currentUserRole={profile?.role ?? null}
+                  activePartnerLabel={activePartnerLabel}
+                  canUseFamilySpace={canUseFamilySpace}
                   onShare={setShareItem}
-                  onToggleFavorite={(id, isFavorite) => {
-                    void toggleFavorite(id, isFavorite);
-                  }}
-                  onDelete={(id) => {
-                    void deleteNote(id);
-                  }}
-                  onMove={(id, space) => {
-                    void moveNoteToSpace(id, space);
-                  }}
+                  onToggleFavorite={(id, isFavorite) => void toggleFavorite(id, isFavorite)}
+                  onDelete={(id) => void deleteNote(id)}
+                  onMove={(id, space) => void moveNoteToSpace(id, space)}
                 />
               )}
             </>
           )}
 
-          {activeTab === "shared" && (
+          {activeTab === "between_us" && (
             <>
               {!notesLoaded ? (
                 <ContentState message="Loading Between Us..." loading />
-              ) : sharedFeed.length === 0 ? (
+              ) : betweenUsNotes.length === 0 ? (
                 <EmptyState
-                  title="Nothing in Between Us yet."
+                  title={canUseBetweenUs ? "Between Us is still waiting for its first note." : "Choose a connection when you're ready."}
                   body={
-                    connected
-                      ? "When one of you intentionally shares a note, it will appear here for both of you."
-                      : "Connect your accounts first, then shared notes will live here for both of you."
+                    canUseBetweenUs
+                      ? `When one of you intentionally shares something with ${activePartnerLabel ?? partnerRole}, it will appear here and stay just between the two of you.`
+                      : "Once you choose a connection, this one-to-one space will open gently here."
                   }
                 />
               ) : (
                 <NotesList
-                  notes={sharedFeed}
+                  notes={betweenUsNotes}
                   currentUserId={session?.user.id}
+                  currentUserRole={profile?.role ?? null}
+                  activePartnerLabel={activePartnerLabel}
+                  canUseFamilySpace={canUseFamilySpace}
                   onShare={setShareItem}
-                  onToggleFavorite={(id, isFavorite) => {
-                    void toggleFavorite(id, isFavorite);
-                  }}
-                  onDelete={(id) => {
-                    void deleteNote(id);
-                  }}
-                  onMove={(id, space) => {
-                    void moveNoteToSpace(id, space);
-                  }}
+                  onToggleFavorite={(id, isFavorite) => void toggleFavorite(id, isFavorite)}
+                  onDelete={(id) => void deleteNote(id)}
+                  onMove={(id, space) => void moveNoteToSpace(id, space)}
+                />
+              )}
+            </>
+          )}
+
+          {activeTab === "family" && (
+            <>
+              {!notesLoaded ? (
+                <ContentState message="Loading Family Space..." loading />
+              ) : familyNotes.length === 0 ? (
+                <EmptyState
+                  title={canUseFamilySpace ? "Family Space is ready whenever you are." : "Family Space opens after connection is set up."}
+                  body={
+                    canUseFamilySpace
+                      ? "When someone intentionally shares a family-wide note, it will appear here for everyone included in that family space."
+                      : "Once connection is in place, Family Space will be ready for shared notes meant for everyone."
+                  }
+                />
+              ) : (
+                <NotesList
+                  notes={familyNotes}
+                  currentUserId={session?.user.id}
+                  currentUserRole={profile?.role ?? null}
+                  activePartnerLabel={activePartnerLabel}
+                  canUseFamilySpace={canUseFamilySpace}
+                  onShare={setShareItem}
+                  onToggleFavorite={(id, isFavorite) => void toggleFavorite(id, isFavorite)}
+                  onDelete={(id) => void deleteNote(id)}
+                  onMove={(id, space) => void moveNoteToSpace(id, space)}
                 />
               )}
             </>
@@ -432,11 +590,11 @@ export default function Notes() {
                 <ContentState message="Loading direct messages..." loading />
               ) : directFeed.length === 0 ? (
                 <EmptyState
-                  title={directEmptyText}
+                  title={canUseBetweenUs ? "No direct messages yet, just open space." : "Choose a connection when you're ready."}
                   body={
-                    connected
-                      ? "Send one gentle message and it will appear here for just the two of you."
-                      : "Once you're connected, direct messages will stay private between sender and recipient only."
+                    canUseBetweenUs
+                      ? `Send one gentle message and it will stay private between you and ${activePartnerLabel ?? partnerRole}.`
+                      : "Direct messages open once you choose the connection you want to write to."
                   }
                 />
               ) : (
@@ -469,9 +627,9 @@ export default function Notes() {
           )}
         </section>
 
-        {activeTab === "shared" && connected && receivedSharedNotes.length > 0 ? (
+        {activeTab === "between_us" && canUseBetweenUs && receivedBetweenUsNotes.length > 0 ? (
           <p className="text-center text-xs text-muted-foreground">
-            Shared notes from {partnerRole} appear here only because they were intentionally moved into Between Us.
+            Notes from {activePartnerLabel ?? partnerRole} appear here only because one of you intentionally shared them into this one-to-one space.
           </p>
         ) : null}
       </div>

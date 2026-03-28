@@ -162,7 +162,7 @@ export default function Affirmations() {
           {!isLoaded ? (
             <ContentState message="Loading affirmations..." loading />
           ) : affirmations.length === 0 ? (
-            <ContentState message="No affirmations yet. Add one to get started." />
+            <ContentState message="Your affirmation shelf is still quiet. Save one that feels like a breath you want to keep nearby." />
           ) : (
             <div className="flex flex-col gap-3">
               {affirmations.map((affirmation) => (

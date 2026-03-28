@@ -51,6 +51,11 @@ export default function OnboardingPage() {
 
     if (result.error) {
       setError(result.error);
+      return;
+    }
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("between-us-show-welcome", "true");
     }
   };
 
@@ -67,6 +72,9 @@ export default function OnboardingPage() {
             <p className="mt-2 text-sm font-medium text-primary/75">{APP_TAGLINE}</p>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
               Tell us what to call you, who this account belongs to, and the age range so we can keep connection setup gentle and safe.
+            </p>
+            <p className="mt-3 text-xs font-semibold tracking-[0.08em] text-primary/75">
+              Everything you share here is private and protected.
             </p>
           </div>
 

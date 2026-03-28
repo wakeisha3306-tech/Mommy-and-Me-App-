@@ -13,17 +13,18 @@ export interface DirectMessage {
 }
 
 const DIRECT_MESSAGE_SELECT = "id, sender_id, recipient_id, sender_role, text, created_at";
+export const NEED_TO_TALK_MESSAGE = "Hey, can we talk? 💛";
 
 export function useDirectMessages() {
   const { session, profile } = useAuth();
   const { connection } = useConnection();
-  const [messages, setMessages] = useState<DirectMessage[]>([]);
+  const [allMessages, setAllMessages] = useState<DirectMessage[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadMessages = useCallback(async () => {
     if (!supabase || !session?.user.id) {
-      setMessages([]);
+      setAllMessages([]);
       setError(null);
       setIsLoaded(true);
       return;
@@ -38,20 +39,28 @@ export function useDirectMessages() {
       .order("created_at", { ascending: false });
 
     if (loadError) {
-      console.error(loadError);
-      setMessages([]);
+      setAllMessages([]);
       setError(loadError.message);
       setIsLoaded(true);
       return;
     }
 
-    setMessages((data ?? []) as DirectMessage[]);
+    setAllMessages((data ?? []) as DirectMessage[]);
     setIsLoaded(true);
   }, [session?.user.id]);
 
   useEffect(() => {
     void loadMessages();
   }, [loadMessages]);
+
+  const messages = useMemo(() => {
+    if (!connection?.partner_id || !session?.user.id) return [];
+    return allMessages.filter(
+      (message) =>
+        (message.sender_id === session.user.id && message.recipient_id === connection.partner_id) ||
+        (message.sender_id === connection.partner_id && message.recipient_id === session.user.id),
+    );
+  }, [allMessages, connection?.partner_id, session?.user.id]);
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -67,7 +76,6 @@ export function useDirectMessages() {
       });
 
       if (insertError) {
-        console.error(insertError);
         setError(insertError.message);
         return false;
       }
@@ -79,13 +87,17 @@ export function useDirectMessages() {
   );
 
   const receivedMessages = useMemo(
-    () => messages.filter((message) => message.recipient_id === session?.user.id),
-    [messages, session?.user.id],
+    () => allMessages.filter((message) => message.recipient_id === session?.user.id),
+    [allMessages, session?.user.id],
   );
+
+  const latestReceivedMessage = useMemo(() => receivedMessages[0] ?? null, [receivedMessages]);
 
   return {
     messages,
+    allMessages,
     receivedMessages,
+    latestReceivedMessage,
     isLoaded,
     error,
     sendMessage,

@@ -1,17 +1,19 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import { HeartHandshake, Link2, Copy, CheckCircle2 } from "lucide-react";
+import { HeartHandshake, Link2, Copy, CheckCircle2, Users } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/context/auth-context";
 import { useConnection } from "@/hooks/use-connection";
-import { formatFriendlyTimestamp } from "@/lib/utils";
+import { formatFriendlyTimestamp, getUserLabel } from "@/lib/utils";
 
 export default function ConnectPage() {
+  const { profile } = useAuth();
   const {
-    connection,
-    activeInvite,
-    inviteLink,
+    connections,
+    activeInvites,
+    inviteLinks,
     isLoaded,
     error,
     partnerRole,
@@ -52,7 +54,11 @@ export default function ConnectPage() {
       return;
     }
 
-    setStatusMessage("Your invite is ready to copy and share.");
+    setStatusMessage(
+      profile?.role === "Mom"
+        ? "A new daughter invite is ready to copy and share."
+        : "Your invite is ready to copy and share with Mom.",
+    );
   };
 
   const handleConnect = async (event: FormEvent<HTMLFormElement>) => {
@@ -68,7 +74,11 @@ export default function ConnectPage() {
       return;
     }
 
-    setStatusMessage("You're connected now. Shared notes can be seen by both of you when you mark them as shared.");
+    setStatusMessage(
+      profile?.role === "Mom"
+        ? "You're connected now. A new Between Us space is ready for this daughter."
+        : "You're connected now. Your Between Us and Family spaces are ready with Mom.",
+    );
   };
 
   const handleCopy = async (value: string, label: string) => {
@@ -82,7 +92,7 @@ export default function ConnectPage() {
   };
 
   return (
-    <Layout title="Connect" subtitle="Link Mom and Daughter, then decide what gets shared">
+    <Layout title="Connect" subtitle="Link Mom and Daughter accounts while keeping every space intentional">
       <div className="mt-3 section-stack">
         <section className="app-feature-card p-6">
           <div className="relative z-10">
@@ -92,9 +102,9 @@ export default function ConnectPage() {
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Connection</p>
-                <h2 className="mt-2 text-2xl font-serif text-foreground">Keep your space private, then share on purpose</h2>
+                <h2 className="mt-2 text-2xl font-serif text-foreground">Keep every relationship clear and cared for</h2>
                 <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                  Connecting accounts does not share anything automatically. Only notes you mark as shared become visible to both of you.
+                  Connecting accounts does not share anything automatically. Between Us stays one-to-one, and Family Space stays separate.
                 </p>
               </div>
             </div>
@@ -116,80 +126,92 @@ export default function ConnectPage() {
         <section className="app-card p-6">
           {!isLoaded ? (
             <p className="text-sm text-muted-foreground">Loading your connection space...</p>
-          ) : connection ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <CheckCircle2 className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Connected</p>
-                  <p className="mt-1 text-lg font-serif text-foreground">Connected to: {partnerRole}</p>
-                </div>
-              </div>
-              <p className="text-sm leading-6 text-muted-foreground">
-                Your connection has been active since {formatFriendlyTimestamp(connection.created_at)}.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Head to{" "}
-                <Link href="/notes">
-                  <span className="cursor-pointer font-semibold text-primary">Notes</span>
-                </Link>{" "}
-                to share something intentionally.
-              </p>
-            </div>
           ) : (
             <div className="space-y-5">
+              {connections.length > 0 ? (
+                <div className="rounded-[1.4rem] border border-border/80 bg-muted/30 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      <Users className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Connected relationships</p>
+                      <p className="mt-1 text-lg font-serif text-foreground">
+                        {profile?.role === "Mom" ? `${connections.length} daughters connected` : `Connected to ${partnerRole}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3">
+                    {connections.map((entry) => (
+                      <div key={entry.id} className="rounded-[1.15rem] border border-border/70 bg-white/85 px-4 py-3">
+                        <p className="text-sm font-semibold text-foreground">
+                          {getUserLabel(entry.partner_name, entry.partner_email ?? undefined)}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Connected since {formatFriendlyTimestamp(entry.created_at)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    Head to{" "}
+                    <Link href="/notes">
+                      <span className="cursor-pointer font-semibold text-primary">Notes</span>
+                    </Link>{" "}
+                    to write in one Between Us space at a time or use Family Space intentionally.
+                  </p>
+                </div>
+              ) : null}
+
               <div className="rounded-[1.4rem] border border-border/80 bg-muted/30 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Invite code</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Invite codes</p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Create one code, then text it or copy the link. Your partner can paste the code on this screen to connect.
+                  {profile?.role === "Mom"
+                    ? "Create a new invite for each daughter you want to connect. Each daughter gets her own Between Us space with you."
+                    : "If you are not connected yet, you can create one invite for Mom or enter her code here."}
                 </p>
 
-                {activeInvite ? (
-                  <div className="mt-4 space-y-3">
-                    <div className="rounded-[1.15rem] border border-primary/15 bg-white/85 px-4 py-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Current code</p>
-                      <p className="mt-2 text-xl font-semibold tracking-[0.28em] text-foreground">{activeInvite.code}</p>
+                <div className="mt-4">
+                  {canCreateInvite ? (
+                    <Button type="button" onClick={() => void handleCreateInvite()} disabled={creatingInvite} className="app-button-primary">
+                      {creatingInvite ? "Creating..." : profile?.role === "Mom" ? "Create daughter invite" : "Create invite"}
+                    </Button>
+                  ) : (
+                    <div className="rounded-[1.15rem] border border-primary/15 bg-primary/8 px-4 py-3 text-sm leading-6 text-muted-foreground">
+                      {inviteRestrictionMessage}
                     </div>
-                    {inviteLink ? (
-                      <div className="rounded-[1.15rem] border border-border/70 bg-white/85 px-4 py-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Invite link</p>
-                        <p className="mt-2 break-all text-sm text-foreground">{inviteLink}</p>
+                  )}
+                </div>
+
+                {activeInvites.length > 0 ? (
+                  <div className="mt-4 grid gap-3">
+                    {inviteLinks.map(({ invite, link }) => (
+                      <div key={invite.id} className="rounded-[1.15rem] border border-border/70 bg-white/85 px-4 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Invite code</p>
+                        <p className="mt-2 text-xl font-semibold tracking-[0.28em] text-foreground">{invite.code}</p>
+                        <p className="mt-2 text-xs text-muted-foreground">Created {formatFriendlyTimestamp(invite.created_at)}</p>
+                        <div className="mt-3 flex flex-wrap gap-3">
+                          <Button type="button" onClick={() => void handleCopy(invite.code, "Invite code")} className="app-button-secondary">
+                            <Copy className="mr-2 h-4 w-4" />
+                            Copy code
+                          </Button>
+                          <Button type="button" onClick={() => void handleCopy(link, "Invite link")} className="app-button-secondary">
+                            <Link2 className="mr-2 h-4 w-4" />
+                            Copy link
+                          </Button>
+                        </div>
                       </div>
-                    ) : null}
-                    <div className="flex flex-wrap gap-3">
-                      <Button type="button" onClick={() => void handleCopy(activeInvite.code, "Invite code")} className="app-button-secondary">
-                        <Copy className="mr-2 h-4 w-4" />
-                        Copy code
-                      </Button>
-                      {inviteLink ? (
-                        <Button type="button" onClick={() => void handleCopy(inviteLink, "Invite link")} className="app-button-secondary">
-                          <Link2 className="mr-2 h-4 w-4" />
-                          Copy link
-                        </Button>
-                      ) : null}
-                    </div>
+                    ))}
                   </div>
-                ) : (
-                  <div className="mt-4">
-                    {canCreateInvite ? (
-                      <Button type="button" onClick={() => void handleCreateInvite()} disabled={creatingInvite} className="app-button-primary">
-                        {creatingInvite ? "Creating..." : "Create invite"}
-                      </Button>
-                    ) : (
-                      <div className="rounded-[1.15rem] border border-primary/15 bg-primary/8 px-4 py-3 text-sm leading-6 text-muted-foreground">
-                        {inviteRestrictionMessage}
-                      </div>
-                    )}
-                  </div>
-                )}
+                ) : null}
               </div>
 
               <form onSubmit={handleConnect} className="rounded-[1.4rem] border border-border/80 bg-muted/30 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Enter invite code</p>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Paste the code from Mom or Daughter here to link your accounts.
+                  Paste the code from Mom or Daughter here to create a new intentional connection.
                 </p>
                 <div className="mt-4 space-y-3">
                   <Input
